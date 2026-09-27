@@ -62,11 +62,11 @@ describe('checkoutSchema', () => {
 })
 
 describe('toCreateOrderPayload', () => {
-  it('monta o payload de entrega e descarta troco fora do dinheiro', () => {
+  it('monta o payload de entrega (sem troco: dinheiro não é aceito)', () => {
     const data = checkoutSchema.parse({
       ...base,
       fulfillment: 'delivery',
-      changeForCents: 5000,
+      changeForCents: 5000, // ignorado
       deliveryZoneId: ZONE,
       cep: '01310-100',
       street: 'Av. Paulista',
@@ -87,11 +87,19 @@ describe('toCreateOrderPayload', () => {
 
   it('retirada não leva endereço', () => {
     const payload = toCreateOrderPayload(
-      checkoutSchema.parse({ ...base, fulfillment: 'pickup', paymentMethod: 'cash', changeForCents: 10000 }),
+      checkoutSchema.parse({ ...base, fulfillment: 'pickup', paymentMethod: 'card_on_delivery' }),
       null,
     )
     expect(payload).not.toHaveProperty('street')
-    expect(payload.change_for_cents).toBe(10000)
+    expect(payload.payment_method).toBe('card_on_delivery')
+  })
+})
+
+describe('formas de pagamento', () => {
+  it('recusa dinheiro mesmo que alguém force o envio', () => {
+    const r = checkoutSchema.safeParse({ ...base, fulfillment: 'pickup', paymentMethod: 'cash' })
+    expect(r.success).toBe(false)
+    expect(fieldErrors(r.error!).paymentMethod).toBe('Escolha a forma de pagamento')
   })
 })
 

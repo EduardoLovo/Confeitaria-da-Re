@@ -126,6 +126,8 @@ tests/                          Vitest
 - **Admin** = logado **e** em `admin_users` (função `is_admin()`). Mesmo logado, o admin só consegue alterar o **status** de um pedido; valores, itens e dados da cliente ficam imutáveis. As transições de status são validadas por trigger, e o histórico é registrado automaticamente.
 - **Fotos:** bucket `images` com leitura pública pela URL, sem listagem pública; upload e exclusão só para admin. As fotos são redimensionadas e convertidas para WebP no navegador antes do upload.
 - Todas as entradas passam por **Zod** (no navegador para mensagens por campo e de novo no servidor).
+- **Cabeçalhos de segurança** em `next.config.ts`: Content Security Policy (o navegador só conversa com o próprio site, o Supabase e o ViaCEP), proteção contra o site ser embutido em outro (clickjacking), HSTS, `nosniff` e `Referrer-Policy`. **Ao adicionar um serviço usado no navegador** (ex.: gateway de pagamento, analytics), inclua o domínio dele na CSP, ou ele será bloqueado.
+- **Cookies:** o site público não grava cookies (o carrinho fica no `localStorage` do aparelho). Só o painel usa cookies, os de sessão do login, que são estritamente necessários. Por isso não há banner de cookies; se um dia entrar Google Analytics, Meta Pixel ou similar, será preciso pedir consentimento (LGPD).
 
 ### Loja aberta
 

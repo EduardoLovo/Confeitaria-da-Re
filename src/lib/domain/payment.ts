@@ -1,6 +1,13 @@
 import type { FulfillmentType, PaymentMethod } from '@/lib/supabase/database.types'
 
-export const PAYMENT_METHODS: readonly PaymentMethod[] = ['pix_on_delivery', 'cash', 'card_on_delivery']
+/**
+ * Formas de pagamento ACEITAS no checkout (fonte única: formulário e validação
+ * no servidor). "cash" continua existindo no banco só para pedidos antigos;
+ * para voltar a aceitar dinheiro, basta incluí-lo aqui e reativar o campo de troco.
+ */
+export const ACCEPTED_PAYMENT_METHODS = ['pix_on_delivery', 'card_on_delivery'] as const satisfies readonly PaymentMethod[]
+
+export type AcceptedPaymentMethod = (typeof ACCEPTED_PAYMENT_METHODS)[number]
 
 /** Rótulo curto; o complemento depende de ser entrega ou retirada. */
 export function paymentLabel(method: PaymentMethod, fulfillment?: FulfillmentType): string {

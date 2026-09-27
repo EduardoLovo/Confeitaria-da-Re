@@ -72,7 +72,6 @@ export async function createOrder(input: unknown): Promise<CreateOrderResult> {
       ok: false,
       message: known.message,
       refresh: known.refresh,
-      fieldErrors: error.message === 'INVALID_CHANGE' ? { changeForCents: known.message } : undefined,
       unavailableProductIds:
         error.message === 'PRODUCT_UNAVAILABLE' && error.details ? error.details.split(',') : undefined,
     }

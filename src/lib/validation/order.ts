@@ -1,6 +1,7 @@
 import { z } from 'zod'
 
 import { MAX_ITEM_QUANTITY, MAX_NOTE_LENGTH } from '@/lib/domain/cart'
+import { ACCEPTED_PAYMENT_METHODS } from '@/lib/domain/payment'
 import { onlyDigits } from '@/lib/format'
 
 // Esquema único do checkout: validado no navegador (mensagens por campo)
@@ -33,8 +34,7 @@ const baseOrderSchema = z.object({
     .min(2, 'Informe seu nome')
     .max(100, 'Nome muito longo'),
   customerPhone: phoneSchema,
-  paymentMethod: z.enum(['pix_on_delivery', 'cash', 'card_on_delivery'], 'Escolha a forma de pagamento'),
-  changeForCents: z.number().int().positive('Valor de troco inválido').max(1_000_000).optional(),
+  paymentMethod: z.enum(ACCEPTED_PAYMENT_METHODS, 'Escolha a forma de pagamento'),
   notes: optionalText(500, 'As observações'),
   items: z.array(orderItemSchema).min(1, 'Seu carrinho está vazio').max(50, 'Itens demais no carrinho'),
 })
@@ -82,7 +82,7 @@ export function toCreateOrderPayload(data: CheckoutData, ipHash: string | null) 
     customer_phone: data.customerPhone,
     fulfillment: data.fulfillment,
     payment_method: data.paymentMethod,
-    change_for_cents: data.paymentMethod === 'cash' ? (data.changeForCents ?? null) : null,
+    change_for_cents: null, // Dinheiro não é aceito (ver ACCEPTED_PAYMENT_METHODS)
     notes: data.notes ?? null,
     ip_hash: ipHash,
     ...(data.fulfillment === 'delivery'

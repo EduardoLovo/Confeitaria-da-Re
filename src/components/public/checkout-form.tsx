@@ -1,6 +1,6 @@
 'use client'
 
-import { Banknote, CreditCard, Loader2, MapPin, QrCode, ShieldCheck, Store, Truck } from 'lucide-react'
+import { CreditCard, Loader2, MapPin, QrCode, ShieldCheck, Store, Truck } from 'lucide-react'
 import Link from 'next/link'
 import { useRouter } from 'next/navigation'
 import { useEffect, useMemo, useRef, useState, useTransition, type ReactNode } from 'react'
@@ -13,10 +13,10 @@ import { Label } from '@/components/ui/label'
 import { Textarea } from '@/components/ui/textarea'
 import { resolveCart } from '@/lib/domain/cart'
 import type { ProductMap } from '@/lib/domain/catalog'
-import { paymentLabel } from '@/lib/domain/payment'
+import { ACCEPTED_PAYMENT_METHODS, paymentLabel, type AcceptedPaymentMethod } from '@/lib/domain/payment'
 import { missingForMinimum } from '@/lib/domain/pricing'
-import { formatBRL, maskCEP, maskPhoneBR, onlyDigits, parseBRLToCents } from '@/lib/format'
-import type { FulfillmentType, PaymentMethod } from '@/lib/supabase/database.types'
+import { formatBRL, maskCEP, maskPhoneBR, onlyDigits } from '@/lib/format'
+import type { FulfillmentType } from '@/lib/supabase/database.types'
 import { checkoutSchema, fieldErrors } from '@/lib/validation/order'
 import { lookupCep, normalizeName } from '@/lib/viacep'
 import { useCart, useCartHydrated } from '@/stores/cart'
@@ -44,8 +44,7 @@ type Form = {
   streetNumber: string
   complement: string
   addressReference: string
-  paymentMethod: PaymentMethod | ''
-  changeFor: string
+  paymentMethod: AcceptedPaymentMethod | ''
   notes: string
 }
 
@@ -60,8 +59,12 @@ const EMPTY: Form = {
   complement: '',
   addressReference: '',
   paymentMethod: '',
-  changeFor: '',
   notes: '',
+}
+
+const PAYMENT_ICON: Record<AcceptedPaymentMethod, ReactNode> = {
+  pix_on_delivery: <QrCode />,
+  card_on_delivery: <CreditCard />,
 }
 
 // Ordem em que o foco procura o primeiro campo com erro.
@@ -76,7 +79,6 @@ const FIELD_ORDER = [
   'complement',
   'addressReference',
   'paymentMethod',
-  'changeForCents',
   'notes',
 ]
 
@@ -110,7 +112,9 @@ export function CheckoutForm(props: Props) {
   }
 
   const zone = zones.find((z) => z.id === form.deliveryZoneId)
-  const feeCents = form.fulfillment === 'delivery' ? (zone?.fee_cents ?? null) : 0
+  // null = ainda não dá para saber (sem forma de recebimento ou sem bairro).
+  const feeCents =
+    form.fulfillment === 'delivery' ? (zone?.fee_cents ?? null) : form.fulfillment === 'pickup' ? 0 : null
   const totalCents = cart.subtotalCents + (feeCents ?? 0)
   const missing = missingForMinimum(cart.subtotalCents, minOrderCents)
   const minZoneFee = zones.length ? Math.min(...zones.map((z) => z.fee_cents)) : null
@@ -158,26 +162,11 @@ export function CheckoutForm(props: Props) {
     event.preventDefault()
     setFormError(null)
 
-    let changeForCents: number | undefined
-    if (form.paymentMethod === 'cash' && form.changeFor.trim()) {
-      const parsed = parseBRLToCents(form.changeFor)
-      if (parsed === null || parsed === 0) {
-        setErrors({ changeForCents: 'Informe um valor válido, ex.: 50,00' })
-        return
-      }
-      if (parsed < totalCents) {
-        setErrors({ changeForCents: `O troco precisa ser para ${formatBRL(totalCents)} ou mais` })
-        return
-      }
-      changeForCents = parsed
-    }
-
     const input = {
       customerName: form.customerName,
       customerPhone: form.customerPhone,
       fulfillment: form.fulfillment,
       paymentMethod: form.paymentMethod,
-      changeForCents,
       notes: form.notes,
       items: cart.lines
         .filter((r) => r.available)
@@ -428,48 +417,19 @@ export function CheckoutForm(props: Props) {
           className="grid gap-2 outline-none"
         >
           <legend className="sr-only">Forma de pagamento</legend>
-          {(
-            [
-              ['pix_on_delivery', <QrCode key="i" />],
-              ['cash', <Banknote key="i" />],
-              ['card_on_delivery', <CreditCard key="i" />],
-            ] as const
-          ).map(([method, icon]) => (
+          {ACCEPTED_PAYMENT_METHODS.map((method) => (
             <RadioCard
               key={method}
               name="paymentMethod"
               checked={form.paymentMethod === method}
               onChange={() => set('paymentMethod', method)}
-              icon={icon}
+              icon={PAYMENT_ICON[method]}
               title={paymentLabel(method, form.fulfillment || undefined)}
               inline
             />
           ))}
         </fieldset>
         <FieldError id="paymentMethod" error={errors.paymentMethod} />
-
-        {form.paymentMethod === 'cash' && (
-          <Field
-            id="changeForCents"
-            label="Troco para quanto? (opcional)"
-            error={errors.changeForCents}
-            hint="Deixe em branco se não precisar de troco."
-          >
-            <div className="relative max-w-48">
-              <span className="pointer-events-none absolute top-1/2 left-3 -translate-y-1/2 text-muted-foreground">
-                R$
-              </span>
-              <Input
-                {...fieldProps('changeForCents', errors, true)}
-                value={form.changeFor}
-                onChange={(e) => set('changeFor', e.target.value.replace(/[^\d,.]/g, ''))}
-                inputMode="decimal"
-                placeholder="50,00"
-                className="h-11 pl-9 text-base"
-              />
-            </div>
-          </Field>
-        )}
       </Section>
 
       {/* ---------- observações ---------- */}
@@ -481,7 +441,7 @@ export function CheckoutForm(props: Props) {
             onChange={(e) => set('notes', e.target.value)}
             maxLength={500}
             rows={3}
-            placeholder="Ex.: é presente, pode caprichar no laço 🎀"
+            placeholder=""
           />
         </Field>
       </Section>
@@ -547,7 +507,10 @@ export function CheckoutForm(props: Props) {
         <ShieldCheck className="size-4 shrink-0" aria-hidden />
         <span>
           <strong>Privacidade:</strong> usamos seu nome, WhatsApp e endereço só para preparar, entregar e
-          falar com você sobre este pedido. Não compartilhamos seus dados com terceiros (LGPD).
+          falar com você sobre este pedido. Não vendemos nem usamos seus dados para outros fins.{' '}
+          <Link href="/privacidade" target="_blank" className="underline underline-offset-2">
+            Política de Privacidade
+          </Link>
         </span>
       </p>
 
