@@ -86,7 +86,7 @@ function ProductForm({ product, onDone }: { product: CatalogProduct; onDone: () 
                 value={note}
                 onChange={(e) => setNote(e.target.value)}
                 maxLength={MAX_NOTE_LENGTH}
-                placeholder="Ex.: sem granulado, embalar separado…"
+                placeholder="Ex.: embalar separado…"
                 rows={2}
               />
             </div>
