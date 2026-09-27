@@ -5,6 +5,7 @@ import Link from 'next/link'
 import type { ReactNode } from 'react'
 
 import { OpenStatus } from '@/components/public/open-status'
+import { TrackOrderShortcut } from '@/components/public/track-order-shortcut'
 import { getStoreInfo } from '@/lib/data/store'
 import { groupOpeningHours } from '@/lib/domain/store-hours'
 import { publicImageUrl } from '@/lib/images'
@@ -47,6 +48,8 @@ export default async function Home() {
           {settings.tagline && <p className="text-muted-foreground">{settings.tagline}</p>}
           <OpenStatus isOpen={isOpen} nextOpening={nextOpening} />
         </header>
+
+        <TrackOrderShortcut />
 
         <nav aria-label="Como você quer comprar?" className="flex flex-col gap-4">
           <PathCard

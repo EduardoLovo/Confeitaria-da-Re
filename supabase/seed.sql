@@ -34,10 +34,10 @@ insert into public.opening_hours (weekday, is_closed, opens, closes) values
 on conflict (weekday) do nothing;
 
 insert into public.whatsapp_templates (status, body) values
-  ('received',         'Oi, {nome}! Recebemos seu pedido #{numero} 💕 Já já confirmamos por aqui.'),
-  ('confirmed',        'Oi, {nome}! Seu pedido #{numero} foi confirmado e já está sendo preparado com carinho 🍫 Total: {total}.'),
-  ('out_for_delivery', 'Oba, {nome}! Seu pedido #{numero} saiu para entrega 🛵 Logo chega aí!'),
-  ('ready_for_pickup', 'Oi, {nome}! Seu pedido #{numero} está pronto para retirada em {endereco_retirada} 🎀'),
+  ('received',         E'Oi, {nome}! Recebemos seu pedido #{numero} 💕 Já já confirmamos por aqui.\n\nAcompanhe: {link}'),
+  ('confirmed',        E'Oi, {nome}! Seu pedido #{numero} foi confirmado e já está sendo preparado com carinho 🍫 Total: {total}.\n\nAcompanhe: {link}'),
+  ('out_for_delivery', E'Oba, {nome}! Seu pedido #{numero} saiu para entrega 🛵 Logo chega aí!\n\nAcompanhe: {link}'),
+  ('ready_for_pickup', E'Oi, {nome}! Seu pedido #{numero} está pronto para retirada em {endereco_retirada} 🎀\n\nAcompanhe: {link}'),
   ('completed',        'Obrigada, {nome}! Pedido #{numero} concluído. Esperamos que você ame seus docinhos 💖'),
   ('cancelled',        'Oi, {nome}. Seu pedido #{numero} foi cancelado. Qualquer dúvida, é só chamar aqui 🙏')
 on conflict (status) do nothing;

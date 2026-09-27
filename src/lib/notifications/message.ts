@@ -12,15 +12,17 @@ export type MessageStore = { name: string; pickup_address: string | null }
 
 /** Usados se a loja ainda não tiver cadastrado o texto daquele status. */
 export const DEFAULT_TEMPLATES: Record<OrderStatus, string> = {
-  received: 'Oi, {nome}! Recebemos seu pedido #{numero} 💕 Já já confirmamos por aqui.',
-  confirmed: 'Oi, {nome}! Seu pedido #{numero} foi confirmado e já está sendo preparado com carinho 🍫 Total: {total}.',
-  out_for_delivery: 'Oba, {nome}! Seu pedido #{numero} saiu para entrega 🛵 Logo chega aí!',
-  ready_for_pickup: 'Oi, {nome}! Seu pedido #{numero} está pronto para retirada em {endereco_retirada} 🎀',
+  received: 'Oi, {nome}! Recebemos seu pedido #{numero} 💕 Já já confirmamos por aqui.\n\nAcompanhe: {link}',
+  confirmed:
+    'Oi, {nome}! Seu pedido #{numero} foi confirmado e já está sendo preparado com carinho 🍫 Total: {total}.\n\nAcompanhe: {link}',
+  out_for_delivery: 'Oba, {nome}! Seu pedido #{numero} saiu para entrega 🛵 Logo chega aí!\n\nAcompanhe: {link}',
+  ready_for_pickup:
+    'Oi, {nome}! Seu pedido #{numero} está pronto para retirada em {endereco_retirada} 🎀\n\nAcompanhe: {link}',
   completed: 'Obrigada, {nome}! Pedido #{numero} concluído. Esperamos que você ame seus docinhos 💖',
   cancelled: 'Oi, {nome}. Seu pedido #{numero} foi cancelado. Qualquer dúvida, é só chamar aqui 🙏',
 }
 
-/** Troca {nome}, {numero}, {total}, {loja}, {endereco_retirada}. Placeholders desconhecidos ficam como estão. */
+/** Troca {nome}, {numero}, {total}, {loja}, {endereco_retirada}, {link}. Placeholders desconhecidos ficam como estão. */
 export function renderTemplate(body: string, vars: Record<string, string>): string {
   return body.replace(/\{(\w+)\}/g, (match, key: string) => (key in vars ? vars[key] : match))
 }
@@ -31,14 +33,18 @@ export function buildCustomerMessage({
   status,
   template,
   store,
+  trackingUrl,
 }: {
   order: MessageOrder
   status: OrderStatus
   template: string | null | undefined
   store: MessageStore
+  /** Link da página de acompanhamento do pedido ({link}). */
+  trackingUrl: string
 }): string {
   const firstName = order.customer_name.trim().split(/\s+/)[0] ?? ''
   return renderTemplate(template?.trim() || DEFAULT_TEMPLATES[status], {
+    link: trackingUrl,
     nome: firstName,
     numero: String(order.number),
     total: formatBRL(order.total_cents).replace(/ /g, ' '),

@@ -70,7 +70,7 @@ export const useCart = create<CartState>()(
       name: 'confeitaria:cart',
       version: 1,
       storage: createJSONStorage(() => localStorage),
-      // Hidratamos manualmente (CartHydrator) para não divergir do HTML do servidor.
+      // Hidratamos manualmente (DeviceStorageHydrator) para não divergir do HTML do servidor.
       skipHydration: true,
       partialize: (state) => ({ lines: state.lines }),
       merge: (persisted, current) => {

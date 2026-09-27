@@ -6,6 +6,7 @@ import type { ReactNode } from 'react'
 
 import { AutoRefresh } from '@/components/public/auto-refresh'
 import { OrderProgress } from '@/components/public/order-progress'
+import { RememberOrder } from '@/components/public/remember-order'
 import { WhatsappFollowButton } from '@/components/public/whatsapp-follow-button'
 import { getPublicOrder } from '@/lib/data/orders'
 import { getStoreInfo } from '@/lib/data/store'
@@ -33,6 +34,7 @@ export default async function OrderPage({ params }: PageProps<'/pedido/[id]'>) {
     <main className="mx-auto flex w-full max-w-xl flex-1 flex-col gap-5 px-4 pt-8 pb-12">
       {/* Enquanto o pedido anda, a página se atualiza sozinha. */}
       {!isFinal && <AutoRefresh intervalMs={30_000} />}
+      <RememberOrder id={order.id} number={order.number} createdAt={order.created_at} status={order.status} />
 
       <header className="flex flex-col items-center gap-2 text-center">
         <CircleCheck className="size-14 text-success" aria-hidden />

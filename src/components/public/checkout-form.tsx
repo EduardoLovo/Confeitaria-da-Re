@@ -20,6 +20,7 @@ import type { FulfillmentType } from '@/lib/supabase/database.types'
 import { checkoutSchema, fieldErrors } from '@/lib/validation/order'
 import { lookupCep, normalizeName } from '@/lib/viacep'
 import { useCart, useCartHydrated } from '@/stores/cart'
+import { useRecentOrders } from '@/stores/recent-orders'
 import { ClosedNotice } from './closed-notice'
 
 type Zone = { id: string; neighborhood: string; fee_cents: number }
@@ -88,6 +89,7 @@ export function CheckoutForm(props: Props) {
   const hydrated = useCartHydrated()
   const lines = useCart((s) => s.lines)
   const clearCart = useCart((s) => s.clear)
+  const rememberOrder = useRecentOrders((s) => s.remember)
   const cart = useMemo(() => resolveCart(lines, products), [lines, products])
 
   const [form, setForm] = useState<Form>(EMPTY)
@@ -191,6 +193,12 @@ export function CheckoutForm(props: Props) {
       const result = await createOrder(input)
       if (result.ok) {
         setPlaced(true)
+        rememberOrder({
+          id: result.orderId,
+          number: result.orderNumber,
+          createdAt: new Date().toISOString(),
+          status: 'received',
+        })
         clearCart()
         router.replace(`/pedido/${result.orderId}`)
         return

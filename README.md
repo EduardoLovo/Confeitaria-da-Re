@@ -53,6 +53,7 @@ Em **Supabase → Project Settings → API Keys** e **Data API**:
 | `NEXT_PUBLIC_SUPABASE_URL` | navegador + servidor | `https://<project-ref>.supabase.co` |
 | `NEXT_PUBLIC_SUPABASE_ANON_KEY` | navegador + servidor | Chave **publishable** (`sb_publishable_…`) ou a antiga **anon** |
 | `SUPABASE_SERVICE_ROLE_KEY` | **somente servidor** | Chave **secret** (`sb_secret_…`) ou a antiga **service_role**. Ignora o RLS: nunca exponha no navegador nem use o prefixo `NEXT_PUBLIC_` |
+| `SITE_URL` | servidor (opcional) | Endereço público do site para o link de acompanhamento nas mensagens (`{link}`). Na Vercel o domínio de produção é detectado sozinho; preencha se usar domínio próprio, ex.: `https://www.confeitariadare.com.br` |
 | `RATE_LIMIT_SALT` | servidor | Texto aleatório longo para o hash de IP do limite de pedidos. Gere com `node -e "console.log(require('crypto').randomBytes(32).toString('hex'))"` |
 
 ---
@@ -139,7 +140,9 @@ tests/                          Vitest
 - Retirada: `Recebido → Confirmado → Pronto para retirada → Concluído`
 - `Cancelado` a partir de qualquer etapa antes de Concluído.
 
-A cada mudança, o botão **“Avisar cliente”** abre o WhatsApp da cliente com o texto daquele status (editável em Configurações → Mensagens; placeholders `{nome}`, `{numero}`, `{total}`, `{loja}`, `{endereco_retirada}`). A página do pedido da cliente se atualiza sozinha a cada 30 s.
+A cada mudança, o botão **“Avisar cliente”** abre o WhatsApp da cliente com o texto daquele status (editável em Configurações → Mensagens; placeholders `{nome}`, `{numero}`, `{total}`, `{loja}`, `{endereco_retirada}` e `{link}`, que é o link de acompanhamento do pedido). A página do pedido da cliente se atualiza sozinha a cada 30 s.
+
+**Acompanhamento sem conta:** a cliente não precisa de login. O link do pedido (com um código impossível de adivinhar) é o acesso: ele abre logo após o pedido, vai nas mensagens de WhatsApp (`{link}`) e fica salvo no aparelho, o que faz a Home mostrar o atalho **“Acompanhar meu pedido”** por 3 dias enquanto o pedido estiver em andamento.
 
 ### Pedidos em tempo real
 

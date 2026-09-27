@@ -1,7 +1,7 @@
 import type { Metadata, Viewport } from 'next'
 import { Fraunces, Nunito } from 'next/font/google'
 
-import { CartHydrator } from '@/components/public/cart-hydrator'
+import { DeviceStorageHydrator } from '@/components/public/device-storage-hydrator'
 import { Toaster } from '@/components/ui/sonner'
 import { getStoreInfo } from '@/lib/data/store'
 import './globals.css'
@@ -33,7 +33,7 @@ export default function RootLayout({ children }: LayoutProps<'/'>) {
     <html lang="pt-BR" className={`${nunito.variable} ${fraunces.variable} h-full antialiased`}>
       <body className="flex min-h-full flex-col">
         {children}
-        <CartHydrator />
+        <DeviceStorageHydrator />
         <Toaster />
       </body>
     </html>

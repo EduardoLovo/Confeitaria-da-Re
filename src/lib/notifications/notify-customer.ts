@@ -2,6 +2,7 @@ import 'server-only'
 
 import type { OrderStatus, Tables } from '@/lib/supabase/database.types'
 import { createServiceClient } from '@/lib/supabase/admin'
+import { orderTrackingUrl } from '@/lib/site-url'
 import { waLink } from '@/lib/whatsapp/wa-link'
 import { buildCustomerMessage } from './message'
 
@@ -42,6 +43,7 @@ export async function notifyCustomer(order: NotifiableOrder, status: OrderStatus
     status,
     template: template.data?.body,
     store: store.data,
+    trackingUrl: orderTrackingUrl(order.id),
   })
 
   return { channel: 'wa_link', url: waLink(order.customer_phone, message), message }

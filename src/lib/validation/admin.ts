@@ -183,6 +183,6 @@ export function parseOpeningHours(formData: FormData) {
   return z.array(dayHoursSchema).length(7).safeParse(days)
 }
 
-export const TEMPLATE_PLACEHOLDERS = ['{nome}', '{numero}', '{total}', '{loja}', '{endereco_retirada}'] as const
+export const TEMPLATE_PLACEHOLDERS = ['{nome}', '{numero}', '{total}', '{loja}', '{endereco_retirada}', '{link}'] as const
 
 export const templateBodySchema = requiredText(1000, 'A mensagem não pode ficar vazia')
