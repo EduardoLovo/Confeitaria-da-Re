@@ -211,6 +211,7 @@ export type Database = {
     Views: { [_ in never]: never }
     Functions: {
       is_admin: { Args: never; Returns: boolean }
+      is_admin_member: { Args: never; Returns: boolean }
       is_store_open_now: { Args: never; Returns: boolean }
       create_order: { Args: { payload: Json }; Returns: Json }
     }

@@ -71,7 +71,13 @@ O cadastro público fica **desligado**. O acesso ao painel exige duas coisas: se
    select id from auth.users where email = 'dona@exemplo.com';
    ```
 
-4. Entre em `/admin`.
+4. Entre em `/admin`. No primeiro acesso, o painel pede para **ativar a verificação em duas etapas** (obrigatória): um código de 6 números gerado no celular (app **Senhas** do iPhone, Google Authenticator, Microsoft Authenticator ou Authy).
+
+### Verificação em duas etapas (2FA)
+
+- Login = e-mail + senha **e** o código do app. Sem o código, o banco (RLS) não libera nada do painel: a função `is_admin()` exige sessão `aal2`.
+- Confira em **Supabase → Authentication → Multi-Factor** se **TOTP** está habilitado (vem ligado por padrão).
+- **Perdeu o celular?** Supabase → **Authentication → Users** → abra o usuário → remova o fator MFA. No próximo login o painel pede para configurar de novo.
 
 Para **remover** um admin: `delete from admin_users where user_id = (select id from auth.users where email = '…');`
 

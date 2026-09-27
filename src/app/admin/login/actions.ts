@@ -3,6 +3,7 @@
 import { redirect } from 'next/navigation'
 import { z } from 'zod'
 
+import { authRedirectFor, resolveAdminAuthState, safeAdminNext } from '@/lib/auth'
 import { createClient } from '@/lib/supabase/server'
 
 export type LoginState = { error: string | null; email: string }
@@ -12,11 +13,6 @@ const loginSchema = z.object({
   password: z.string().min(1, 'Informe a senha'),
   next: z.string().optional(),
 })
-
-/** Só aceita redirecionar para dentro do /admin (evita open redirect). */
-function safeNext(next: string | undefined): string {
-  return next && next.startsWith('/admin') && !next.startsWith('//') ? next : '/admin/pedidos'
-}
 
 export async function signIn(_prev: LoginState, formData: FormData): Promise<LoginState> {
   const parsed = loginSchema.safeParse(Object.fromEntries(formData))
@@ -38,13 +34,16 @@ export async function signIn(_prev: LoginState, formData: FormData): Promise<Log
     }
   }
 
-  const { data: isAdmin } = await supabase.rpc('is_admin')
-  if (!isAdmin) {
+  const { data: isMember } = await supabase.rpc('is_admin_member')
+  if (!isMember) {
     await supabase.auth.signOut()
     return { error: 'Este usuário não tem acesso ao painel.', email }
   }
 
-  redirect(safeNext(parsed.data.next))
+  // Senha certa: agora falta o segundo fator (código do app) ou configurá-lo.
+  const next = safeAdminNext(parsed.data.next)
+  const state = await resolveAdminAuthState(supabase)
+  redirect(authRedirectFor(state, next) ?? next)
 }
 
 export async function signOut() {
