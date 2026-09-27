@@ -34,7 +34,7 @@ export default async function Home() {
 
       <div className="relative mx-auto flex max-w-md flex-col gap-8 px-4 pt-12 pb-10">
         <header className="flex flex-col items-center gap-3 text-center">
-          <div className="relative aspect-[828/765] w-64 overflow-hidden rounded-3xl border-4 border-card shadow-lg">
+          <div className="relative aspect-[828/765] w-64 overflow-hidden rounded-3xl shadow-lg">
             <Image
               src={logo}
               alt={`Logo ${settings.name}`}
