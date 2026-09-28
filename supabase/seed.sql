@@ -5,7 +5,7 @@
 
 insert into public.store_settings (
   id, name, tagline, whatsapp, pickup_address, instagram_handle,
-  is_open_switch, min_order_cents,
+  is_open_switch, min_order_cents, delivery_fee_cents,
   custom_intro, custom_min_quantity, custom_min_lead_days
 ) values (
   true,
@@ -16,6 +16,7 @@ insert into public.store_settings (
   null, -- @ do Instagram: preencha no painel admin
   true,
   3000,
+  800,
   'Fazemos docinhos personalizados para aniversários, casamentos, chás e batizados. '
     || 'Cada encomenda é pensada junto com você: sabores, cores das forminhas e decoração combinando com o tema da festa.',
   50,
@@ -67,15 +68,6 @@ from (values
 ) as p(category_slug, name, description, price_cents, sort_order, is_available)
 join public.categories c on c.slug = p.category_slug
 where not exists (select 1 from public.products);
-
-insert into public.delivery_zones (neighborhood, fee_cents, sort_order) values
-  ('Vila Mariana', 600, 1),
-  ('Moema',        800, 2),
-  ('Saúde',        800, 3),
-  ('Ipiranga',    1000, 4),
-  ('Aclimação',    800, 5),
-  ('Paraíso',      700, 6)
-on conflict (neighborhood) do nothing;
 
 insert into public.custom_flavors (name, description, highlights, sort_order)
 select * from (values

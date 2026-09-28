@@ -4,7 +4,6 @@ import { waLink } from '@/lib/whatsapp/wa-link'
 import { checkoutSchema, fieldErrors, toCreateOrderPayload } from '@/lib/validation/order'
 
 const PRODUCT = '00000000-0000-4000-8000-00000000000a'
-const ZONE = '00000000-0000-4000-8000-0000000000b0'
 
 const base = {
   customerName: '  Maria  ',
@@ -25,7 +24,7 @@ describe('checkoutSchema', () => {
     const r = checkoutSchema.safeParse({ ...base, fulfillment: 'delivery', street: '', streetNumber: '' })
     expect(r.success).toBe(false)
     const errors = fieldErrors(r.error!)
-    expect(errors.deliveryZoneId).toBe('Escolha o bairro')
+    expect(errors.neighborhood).toBe('Informe o bairro')
     expect(errors.street).toBe('Informe a rua')
     expect(errors.streetNumber).toBe('Informe o número')
   })
@@ -40,7 +39,7 @@ describe('checkoutSchema', () => {
       ...base,
       customerPhone: '98765-4321',
       fulfillment: 'delivery',
-      deliveryZoneId: ZONE,
+      neighborhood: ' Bela Vista ',
       cep: '0131',
       street: 'Rua A',
       streetNumber: '1',
@@ -67,7 +66,7 @@ describe('toCreateOrderPayload', () => {
       ...base,
       fulfillment: 'delivery',
       changeForCents: 5000, // ignorado
-      deliveryZoneId: ZONE,
+      neighborhood: ' Bela Vista ',
       cep: '01310-100',
       street: 'Av. Paulista',
       streetNumber: '1000',
@@ -75,7 +74,7 @@ describe('toCreateOrderPayload', () => {
     const payload = toCreateOrderPayload(data, 'hash')
     expect(payload).toMatchObject({
       fulfillment: 'delivery',
-      delivery_zone_id: ZONE,
+      neighborhood: 'Bela Vista',
       cep: '01310100',
       change_for_cents: null,
       ip_hash: 'hash',

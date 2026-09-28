@@ -82,15 +82,31 @@ export function StoreForm({ settings }: { settings: Settings }) {
           className={inputClass}
         />
       </FormField>
-      <FormField id="min_order" label="Pedido mínimo (R$)" error={errors.min_order} hint="Use 0 para não ter mínimo.">
-        <Input
-          {...a11y('min_order', errors.min_order)}
-          name="min_order"
-          inputMode="decimal"
-          defaultValue={centsToInput(settings.min_order_cents)}
-          className={`${inputClass} max-w-40`}
-        />
-      </FormField>
+      <div className="grid gap-4 sm:grid-cols-2">
+        <FormField id="min_order" label="Pedido mínimo (R$)" error={errors.min_order} hint="Use 0 para não ter mínimo.">
+          <Input
+            {...a11y('min_order', errors.min_order)}
+            name="min_order"
+            inputMode="decimal"
+            defaultValue={centsToInput(settings.min_order_cents)}
+            className={`${inputClass} max-w-40`}
+          />
+        </FormField>
+        <FormField
+          id="delivery_fee"
+          label="Taxa de entrega (R$)"
+          error={errors.delivery_fee}
+          hint="Valor único para qualquer endereço. Use 0 para entrega grátis."
+        >
+          <Input
+            {...a11y('delivery_fee', errors.delivery_fee)}
+            name="delivery_fee"
+            inputMode="decimal"
+            defaultValue={centsToInput(settings.delivery_fee_cents)}
+            className={`${inputClass} max-w-40`}
+          />
+        </FormField>
+      </div>
       <SaveButton pending={pending} />
     </form>
   )

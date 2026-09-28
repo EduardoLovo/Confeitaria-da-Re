@@ -14,7 +14,7 @@ export async function removeImages(session: AdminSession, paths: (string | null 
 /** Grava sort_order = posição na lista recebida. */
 export async function applyOrder(
   session: AdminSession,
-  table: 'categories' | 'products' | 'delivery_zones' | 'custom_flavors' | 'custom_gallery',
+  table: 'categories' | 'products' | 'custom_flavors' | 'custom_gallery',
   ids: string[],
 ) {
   const results = await Promise.all(

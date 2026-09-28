@@ -1,6 +1,6 @@
 'use client'
 
-import { ClipboardList, Cookie, Gift, MapPinned, Settings } from 'lucide-react'
+import { ClipboardList, Cookie, Gift, Settings } from 'lucide-react'
 import Link from 'next/link'
 import { usePathname } from 'next/navigation'
 import { cn } from 'cn'
@@ -9,7 +9,6 @@ const LINKS = [
   { href: '/admin/pedidos', label: 'Pedidos', icon: ClipboardList },
   { href: '/admin/produtos', label: 'Produtos', icon: Cookie },
   { href: '/admin/encomendas', label: 'Encomendas', icon: Gift },
-  { href: '/admin/bairros', label: 'Bairros', icon: MapPinned },
   { href: '/admin/configuracoes', label: 'Configurações', icon: Settings },
 ] as const
 

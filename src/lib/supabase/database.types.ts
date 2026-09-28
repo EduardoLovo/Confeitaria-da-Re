@@ -27,6 +27,7 @@ type StoreSettingsRow = {
   instagram_handle: string | null
   is_open_switch: boolean
   min_order_cents: number
+  delivery_fee_cents: number
   custom_intro: string | null
   custom_min_quantity: number | null
   custom_min_lead_days: number | null

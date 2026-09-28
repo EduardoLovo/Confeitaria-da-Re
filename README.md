@@ -4,7 +4,7 @@ Cardápio próprio (sem comissão de marketplace) para uma confeitaria de docinh
 
 - **Delivery / pronta entrega** (`/pronta-entrega`): catálogo por categoria, carrinho, checkout com entrega ou retirada e página de acompanhamento do pedido.
 - **Encomendas para festa** (`/encomendas`): portfólio (galeria, sabores) e um formulário que monta a mensagem e abre o WhatsApp da loja. Nada é salvo.
-- **Painel** (`/admin`): pedidos em tempo real com alerta sonoro, fluxo de status com botão “Avisar cliente”, produtos, sabores, galeria, bairros e configurações.
+- **Painel** (`/admin`): pedidos em tempo real com alerta sonoro, fluxo de status com botão “Avisar cliente”, produtos, sabores, galeria e configurações (inclusive a taxa de entrega, única para todos os endereços).
 
 Fase 1: **sem pagamento online** (paga na entrega/retirada) e **sem API do WhatsApp** (links `wa.me`). A arquitetura já está preparada para as Fases 2 e 3 (veja [Próximas fases](#próximas-fases)).
 
@@ -110,7 +110,7 @@ src/
     pedido/[id]/                Confirmação/acompanhamento (UUID na URL)
     encomendas/                 Encomendas para festa
     admin/login/                Login
-    admin/(protected)/          Painel (pedidos, produtos, encomendas, bairros, configurações)
+    admin/(protected)/          Painel (pedidos, produtos, encomendas, configurações)
   components/public | admin | ui
   lib/
     data/                       Leituras no servidor (loja, catálogo, pedidos)
@@ -128,8 +128,8 @@ tests/                          Vitest
 
 ### Segurança
 
-- **Preços e totais sempre calculados no banco.** O navegador envia só produto, quantidade e observação. A função SQL `create_order()` (transação única) confere: loja aberta, produtos ativos e disponíveis, bairro válido, pedido mínimo, troco, e o **rate limit** (3 pedidos por IP a cada 10 min; o IP é guardado só como hash). Ela só pode ser executada pela `service_role`.
-- **RLS em todas as tabelas.** O público lê apenas catálogo, sabores, galeria, bairros e configurações ativos. **Pedidos nunca são legíveis publicamente**: a página `/pedido/[id]` busca no servidor pelo UUID e mostra só campos seguros.
+- **Preços e totais sempre calculados no banco.** O navegador envia só produto, quantidade e observação. A função SQL `create_order()` (transação única) confere: loja aberta, produtos ativos e disponíveis, endereço completo (a taxa de entrega é a fixa da loja), pedido mínimo, troco, e o **rate limit** (3 pedidos por IP a cada 10 min; o IP é guardado só como hash). Ela só pode ser executada pela `service_role`.
+- **RLS em todas as tabelas.** O público lê apenas catálogo, sabores, galeria e configurações ativos. **Pedidos nunca são legíveis publicamente**: a página `/pedido/[id]` busca no servidor pelo UUID e mostra só campos seguros.
 - **Admin** = logado **e** em `admin_users` (função `is_admin()`). Mesmo logado, o admin só consegue alterar o **status** de um pedido; valores, itens e dados da cliente ficam imutáveis. As transições de status são validadas por trigger, e o histórico é registrado automaticamente.
 - **Fotos:** bucket `images` com leitura pública pela URL, sem listagem pública; upload e exclusão só para admin. As fotos são redimensionadas e convertidas para WebP no navegador antes do upload.
 - Todas as entradas passam por **Zod** (no navegador para mensagens por campo e de novo no servidor).
@@ -170,4 +170,4 @@ O painel assina o Supabase Realtime (tabela `orders`, filtrada pelo RLS). Em cad
 
 ## Dados de exemplo
 
-O `seed.sql` cria configurações da loja, horários (ter–sáb, 10h–19h), 4 categorias e 12 produtos, 6 bairros, 6 sabores e as mensagens de WhatsApp. Troque tudo pelo painel; nada disso exige mexer no código.
+O `seed.sql` cria configurações da loja, horários (ter–sáb, 10h–19h), 4 categorias e 12 produtos, taxa de entrega de R$ 8,00, 6 sabores e as mensagens de WhatsApp. Troque tudo pelo painel; nada disso exige mexer no código.

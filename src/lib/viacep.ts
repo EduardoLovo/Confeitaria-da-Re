@@ -27,12 +27,3 @@ export async function lookupCep(cep: string, signal?: AbortSignal): Promise<CepA
     state: parsed.data.uf ?? '',
   }
 }
-
-/** "Saúde " → "saude", para comparar bairros. */
-export function normalizeName(value: string): string {
-  return value
-    .normalize('NFD')
-    .replace(/[̀-ͯ]/g, '')
-    .trim()
-    .toLowerCase()
-}

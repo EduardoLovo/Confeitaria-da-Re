@@ -7,7 +7,6 @@ import {
   parseOpeningHours,
   productSchema,
   storeSettingsSchema,
-  zoneSchema,
 } from '@/lib/validation/admin'
 
 const CATEGORY = '00000000-0000-4000-8000-00000000000a'
@@ -42,14 +41,8 @@ describe('productSchema', () => {
   })
 })
 
-describe('zoneSchema', () => {
-  it('aceita taxa zero', () => {
-    expect(zoneSchema.parse({ neighborhood: 'Centro', fee: '0' }).fee).toBe(0)
-  })
-})
-
 describe('storeSettingsSchema', () => {
-  const base = { name: 'Loja', min_order: '30,00' }
+  const base = { name: 'Loja', min_order: '30,00', delivery_fee: '8,00' }
 
   it('normaliza WhatsApp e Instagram', () => {
     const s = storeSettingsSchema.parse({

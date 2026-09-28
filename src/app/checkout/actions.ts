@@ -14,7 +14,7 @@ export type CreateOrderResult =
       fieldErrors?: Record<string, string>
       /** Produtos que esgotaram/saíram do cardápio: a página recarrega o catálogo. */
       unavailableProductIds?: string[]
-      /** O front deve recarregar os dados do servidor (catálogo, bairros, loja). */
+      /** O front deve recarregar os dados do servidor (catálogo, frete, loja). */
       refresh?: boolean
     }
 
@@ -34,9 +34,8 @@ const FRIENDLY_ERRORS: Record<string, { message: string; refresh?: boolean }> = 
     refresh: true,
   },
   BELOW_MINIMUM: { message: 'O pedido ainda não atingiu o valor mínimo.', refresh: true },
-  INVALID_ZONE: {
-    message: 'Esse bairro não está mais na nossa área de entrega. Escolha outro ou retire na loja.',
-    refresh: true,
+  INVALID_ADDRESS: {
+    message: 'Confira o endereço de entrega.',
   },
   INVALID_CHANGE: { message: 'O valor do troco precisa ser maior que o total do pedido.' },
   INVALID_ITEMS: { message: 'Há algum problema com os itens do carrinho. Revise e tente de novo.' },

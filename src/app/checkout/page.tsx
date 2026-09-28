@@ -4,7 +4,6 @@ import { CheckoutForm } from '@/components/public/checkout-form'
 import { PageHeader } from '@/components/public/page-header'
 import { getCatalog } from '@/lib/data/catalog'
 import { getStoreInfo } from '@/lib/data/store'
-import { getDeliveryZones } from '@/lib/data/zones'
 import { toProductMap } from '@/lib/domain/catalog'
 import { groupOpeningHours } from '@/lib/domain/store-hours'
 
@@ -14,11 +13,7 @@ export const metadata: Metadata = {
 }
 
 export default async function CheckoutPage() {
-  const [store, categories, zones] = await Promise.all([
-    getStoreInfo(),
-    getCatalog(),
-    getDeliveryZones(),
-  ])
+  const [store, categories] = await Promise.all([getStoreInfo(), getCatalog()])
 
   return (
     <>
@@ -26,7 +21,7 @@ export default async function CheckoutPage() {
       <main className="mx-auto w-full max-w-xl flex-1 px-4 pt-4">
         <CheckoutForm
           products={toProductMap(categories)}
-          zones={zones}
+          deliveryFeeCents={store.settings.delivery_fee_cents}
           isOpen={store.isOpen}
           nextOpening={store.nextOpening}
           minOrderCents={store.settings.min_order_cents}

@@ -84,13 +84,6 @@ export const productSchema = z.object({
   is_available: checkbox,
 })
 
-export const zoneSchema = z.object({
-  id: optionalId,
-  neighborhood: requiredText(80, 'Informe o bairro'),
-  fee: money('Informe a taxa, ex.: 6,00'),
-  is_active: checkbox,
-})
-
 // ---------- encomendas ----------
 
 export const flavorSchema = z.object({
@@ -146,6 +139,7 @@ export const storeSettingsSchema = z.object({
     .refine((v) => v === null || /^[A-Za-z0-9._]{1,30}$/.test(v), 'Use só o @ do Instagram, ex.: minhaloja'),
   pickup_address: optionalText(200),
   min_order: money('Informe o pedido mínimo, ex.: 30,00'),
+  delivery_fee: money('Informe a taxa de entrega, ex.: 8,00'),
   logo_path: imagePath('store'),
 })
 

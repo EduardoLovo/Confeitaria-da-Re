@@ -41,7 +41,7 @@ const baseOrderSchema = z.object({
 
 const deliverySchema = baseOrderSchema.extend({
   fulfillment: z.literal('delivery'),
-  deliveryZoneId: z.uuid('Escolha o bairro'),
+  neighborhood: z.string('Informe o bairro').trim().min(2, 'Informe o bairro').max(80, 'Bairro muito longo'),
   cep: z
     .string()
     .transform(onlyDigits)
@@ -87,7 +87,7 @@ export function toCreateOrderPayload(data: CheckoutData, ipHash: string | null) 
     ip_hash: ipHash,
     ...(data.fulfillment === 'delivery'
       ? {
-          delivery_zone_id: data.deliveryZoneId,
+          neighborhood: data.neighborhood,
           cep: data.cep ?? null,
           street: data.street,
           street_number: data.streetNumber,

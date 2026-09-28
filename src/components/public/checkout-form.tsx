@@ -18,16 +18,14 @@ import { missingForMinimum } from '@/lib/domain/pricing'
 import { formatBRL, maskCEP, maskPhoneBR, onlyDigits } from '@/lib/format'
 import type { FulfillmentType } from '@/lib/supabase/database.types'
 import { checkoutSchema, fieldErrors } from '@/lib/validation/order'
-import { lookupCep, normalizeName } from '@/lib/viacep'
+import { lookupCep } from '@/lib/viacep'
 import { useCart, useCartHydrated } from '@/stores/cart'
 import { useRecentOrders } from '@/stores/recent-orders'
 import { ClosedNotice } from './closed-notice'
 
-type Zone = { id: string; neighborhood: string; fee_cents: number }
-
 type Props = {
   products: ProductMap
-  zones: Zone[]
+  deliveryFeeCents: number
   isOpen: boolean
   nextOpening: string | null
   minOrderCents: number
@@ -39,7 +37,7 @@ type Form = {
   customerName: string
   customerPhone: string
   fulfillment: FulfillmentType | ''
-  deliveryZoneId: string
+  neighborhood: string
   cep: string
   street: string
   streetNumber: string
@@ -53,7 +51,7 @@ const EMPTY: Form = {
   customerName: '',
   customerPhone: '',
   fulfillment: '',
-  deliveryZoneId: '',
+  neighborhood: '',
   cep: '',
   street: '',
   streetNumber: '',
@@ -74,17 +72,17 @@ const FIELD_ORDER = [
   'customerPhone',
   'fulfillment',
   'cep',
-  'deliveryZoneId',
   'street',
   'streetNumber',
   'complement',
+  'neighborhood',
   'addressReference',
   'paymentMethod',
   'notes',
 ]
 
 export function CheckoutForm(props: Props) {
-  const { products, zones, isOpen, nextOpening, minOrderCents, pickupAddress, pickupHours } = props
+  const { products, deliveryFeeCents, isOpen, nextOpening, minOrderCents, pickupAddress, pickupHours } = props
   const router = useRouter()
   const hydrated = useCartHydrated()
   const lines = useCart((s) => s.lines)
@@ -95,7 +93,7 @@ export function CheckoutForm(props: Props) {
   const [form, setForm] = useState<Form>(EMPTY)
   const [errors, setErrors] = useState<Record<string, string>>({})
   const [formError, setFormError] = useState<string | null>(null)
-  const [cepStatus, setCepStatus] = useState<'idle' | 'loading' | 'notFound' | 'zoneNotServed'>('idle')
+  const [cepStatus, setCepStatus] = useState<'idle' | 'loading' | 'notFound'>('idle')
   const [pending, startTransition] = useTransition()
   const [placed, setPlaced] = useState(false)
   const errorBoxRef = useRef<HTMLDivElement>(null)
@@ -113,13 +111,10 @@ export function CheckoutForm(props: Props) {
     }
   }
 
-  const zone = zones.find((z) => z.id === form.deliveryZoneId)
-  // null = ainda não dá para saber (sem forma de recebimento ou sem bairro).
-  const feeCents =
-    form.fulfillment === 'delivery' ? (zone?.fee_cents ?? null) : form.fulfillment === 'pickup' ? 0 : null
+  // null = ainda não escolheu a forma de recebimento.
+  const feeCents = form.fulfillment === 'delivery' ? deliveryFeeCents : form.fulfillment === 'pickup' ? 0 : null
   const totalCents = cart.subtotalCents + (feeCents ?? 0)
   const missing = missingForMinimum(cart.subtotalCents, minOrderCents)
-  const minZoneFee = zones.length ? Math.min(...zones.map((z) => z.fee_cents)) : null
 
   // Autocompleta rua e bairro pelo CEP (opcional), assim que tiver 8 dígitos.
   function handleCepChange(value: string) {
@@ -140,13 +135,12 @@ export function CheckoutForm(props: Props) {
       .then((address) => {
         if (controller.signal.aborted) return
         if (!address) return setCepStatus('notFound')
-        const match = zones.find((z) => normalizeName(z.neighborhood) === normalizeName(address.neighborhood))
         setForm((f) => ({
           ...f,
           street: f.street || address.street,
-          deliveryZoneId: match ? match.id : f.deliveryZoneId,
+          neighborhood: f.neighborhood || address.neighborhood,
         }))
-        setCepStatus(match || !address.neighborhood ? 'idle' : 'zoneNotServed')
+        setCepStatus('idle')
       })
       .catch(() => {
         if (!controller.signal.aborted) setCepStatus('notFound')
@@ -174,7 +168,7 @@ export function CheckoutForm(props: Props) {
         .filter((r) => r.available)
         .map((r) => ({ productId: r.line.productId, quantity: r.line.quantity, note: r.line.note })),
       ...(form.fulfillment === 'delivery' && {
-        deliveryZoneId: form.deliveryZoneId,
+        neighborhood: form.neighborhood,
         cep: form.cep,
         street: form.street,
         streetNumber: form.streetNumber,
@@ -286,7 +280,7 @@ export function CheckoutForm(props: Props) {
             onChange={() => set('fulfillment', 'delivery')}
             icon={<Truck />}
             title="Entrega"
-            detail={minZoneFee !== null ? `a partir de ${formatBRL(minZoneFee)}` : undefined}
+            detail={deliveryFeeCents > 0 ? formatBRL(deliveryFeeCents) : 'Grátis'}
           />
           <RadioCard
             name="fulfillment"
@@ -310,9 +304,7 @@ export function CheckoutForm(props: Props) {
                   ? 'Buscando endereço…'
                   : cepStatus === 'notFound'
                     ? 'Não encontramos esse CEP. Preencha o endereço abaixo.'
-                    : cepStatus === 'zoneNotServed'
-                      ? 'Seu bairro pode não estar na nossa área de entrega. Confira a lista abaixo.'
-                      : 'Preenche a rua automaticamente.'
+                    : 'Preenche a rua e o bairro automaticamente.'
               }
             >
               <Input
@@ -325,25 +317,6 @@ export function CheckoutForm(props: Props) {
                 className="h-11 max-w-40 text-base"
               />
             </Field>
-
-            <Field id="deliveryZoneId" label="Bairro" error={errors.deliveryZoneId}>
-              <select
-                {...fieldProps('deliveryZoneId', errors)}
-                value={form.deliveryZoneId}
-                onChange={(e) => set('deliveryZoneId', e.target.value)}
-                className="h-11 w-full rounded-lg border border-input bg-card px-3 text-base outline-none focus-visible:border-ring focus-visible:ring-3 focus-visible:ring-ring/50 aria-invalid:border-destructive"
-              >
-                <option value="">Selecione o bairro</option>
-                {zones.map((z) => (
-                  <option key={z.id} value={z.id}>
-                    {z.neighborhood} — {formatBRL(z.fee_cents)}
-                  </option>
-                ))}
-              </select>
-            </Field>
-            <p className="-mt-2 text-xs text-muted-foreground">
-              Não achou seu bairro? Escolha retirada ou chame a gente no WhatsApp.
-            </p>
 
             <Field id="street" label="Rua" error={errors.street}>
               <Input
@@ -376,6 +349,16 @@ export function CheckoutForm(props: Props) {
                 />
               </Field>
             </div>
+
+            <Field id="neighborhood" label="Bairro" error={errors.neighborhood}>
+              <Input
+                {...fieldProps('neighborhood', errors)}
+                value={form.neighborhood}
+                onChange={(e) => set('neighborhood', e.target.value)}
+                autoComplete="address-level3"
+                maxLength={80}
+              />
+            </Field>
 
             <Field id="addressReference" label="Ponto de referência (opcional)" error={errors.addressReference}>
               <Input
@@ -476,13 +459,7 @@ export function CheckoutForm(props: Props) {
           <div className="flex justify-between">
             <dt>Taxa de entrega</dt>
             <dd className="tabular-nums">
-              {form.fulfillment === 'pickup'
-                ? 'Grátis'
-                : feeCents === null
-                  ? form.fulfillment === 'delivery'
-                    ? 'Selecione o bairro'
-                    : '—'
-                  : formatBRL(feeCents)}
+              {feeCents === null ? '—' : feeCents === 0 ? 'Grátis' : formatBRL(feeCents)}
             </dd>
           </div>
           <div className="flex justify-between pt-1 text-base font-bold">

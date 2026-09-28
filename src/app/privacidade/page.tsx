@@ -64,7 +64,7 @@ export default async function PrivacyPage() {
                   'Identificar o seu pedido e falar com você sobre ele (confirmação, entrega, retirada, dúvidas).',
                 ],
                 [
-                  'Endereço de entrega (rua, número, complemento, referência, bairro e CEP)',
+                  'Endereço de entrega (rua, número, complemento, bairro, referência e CEP)',
                   'Entregar o pedido e calcular a taxa de entrega. Só é pedido quando você escolhe entrega.',
                 ],
                 [

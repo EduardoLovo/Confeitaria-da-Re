@@ -35,12 +35,12 @@ export async function saveStoreSettings(formData: FormData): Promise<ActionResul
     const parsed = storeSettingsSchema.safeParse(formToObject(formData))
     if (!parsed.success) return validationFailed(parsed.error)
     const session = await requireAdminAction()
-    const { min_order, ...fields } = parsed.data
+    const { min_order, delivery_fee, ...fields } = parsed.data
 
     const { data: current } = await session.supabase.from('store_settings').select('logo_path').eq('id', true).single()
     const { error } = await session.supabase
       .from('store_settings')
-      .update({ ...fields, min_order_cents: min_order })
+      .update({ ...fields, min_order_cents: min_order, delivery_fee_cents: delivery_fee })
       .eq('id', true)
     if (error) return dbFailed(error, 'salvar dados da loja')
 
