@@ -55,6 +55,7 @@ Em **Supabase → Project Settings → API Keys** e **Data API**:
 | `SUPABASE_SERVICE_ROLE_KEY` | **somente servidor** | Chave **secret** (`sb_secret_…`) ou a antiga **service_role**. Ignora o RLS: nunca exponha no navegador nem use o prefixo `NEXT_PUBLIC_` |
 | `SITE_URL` | servidor (opcional) | Endereço público do site para o link de acompanhamento nas mensagens (`{link}`). Na Vercel o domínio de produção é detectado sozinho; preencha se usar domínio próprio, ex.: `https://www.confeitariadare.com.br` |
 | `RATE_LIMIT_SALT` | servidor | Texto aleatório longo para o hash de IP do limite de pedidos. Gere com `node -e "console.log(require('crypto').randomBytes(32).toString('hex'))"` |
+| `INFINITEPAY_HANDLE` | servidor | InfiniteTag da loja na InfinitePay, **sem o `$`** (ex.: `renata-do-couto-soares`). Necessária para o pagamento online (obrigatório na entrega) |
 | `CALLMEBOT_RECIPIENTS` | servidor (opcional) | Quem recebe o aviso de pedido novo no WhatsApp: pares `número:chave` separados por vírgula, ex.: `5511999999999:123456,5511988888888:654321` (DDI+DDD, só dígitos; cada número ativa o CallMeBot e recebe a própria chave). Sem ela, o aviso não é enviado |
 
 ---
@@ -88,13 +89,13 @@ Para **remover** um admin: `delete from admin_users where user_id = (select id f
 
 1. Suba o código para um repositório no GitHub (o `.env.local` **não** vai junto; ele está no `.gitignore`).
 2. Na [Vercel](https://vercel.com): **Add New → Project**, importe o repositório. O framework (Next.js) é detectado sozinho.
-3. Em **Environment Variables**, cadastre as 4 variáveis acima (Production e Preview).
+3. Em **Environment Variables**, cadastre as variáveis acima (Production e Preview).
 4. **Deploy**.
 5. Recomendado: em **Settings → Functions → Function Region**, escolha a região mais próxima do seu projeto Supabase (para Supabase em São Paulo, `gru1`). Isso deixa o site mais rápido.
 6. Domínio próprio (opcional): **Settings → Domains**.
 7. Coloque o link no Instagram 🎉
 
-Migrations novas: rode `npm run db:push` **antes** de publicar o código que depende delas.
+Migrations novas: rode `npm run db:push` **antes** de publicar o código que depende delas. Se a migration muda uma regra que o código atual usa (ex.: a 0011 passou a exigir pagamento online na entrega), faça o `db:push` e o deploy um logo depois do outro, de preferência com a loja fechada.
 
 ---
 
@@ -108,7 +109,9 @@ src/
     page.tsx                    Home
     pronta-entrega/             Catálogo (Delivery)
     checkout/                   Checkout + Server Action createOrder
-    pedido/[id]/                Confirmação/acompanhamento (UUID na URL)
+    pedido/[id]/                Confirmação/acompanhamento (UUID na URL) e "Pagar agora"
+    pedido/[id]/pagamento/      Volta do checkout da InfinitePay (confere o pagamento)
+    api/pagamentos/infinitepay/ Webhook da InfinitePay
     encomendas/                 Encomendas para festa
     admin/login/                Login
     admin/(protected)/          Painel (pedidos, produtos, encomendas, configurações)
@@ -117,7 +120,8 @@ src/
     data/                       Leituras no servidor (loja, catálogo, pedidos)
     domain/                     Regras puras (status, horários, carrinho, preços)
     validation/                 Schemas Zod (checkout e painel)
-    notifications/              notifyCustomer() — ponto único de notificação
+    notifications/              notifyCustomer() (cliente) e notifyOwnerNewOrder() (loja, CallMeBot)
+    payments/                   InfinitePay: link de pagamento e confirmação
     whatsapp/                   Links wa.me e mensagem de encomenda
     supabase/                   Clientes (servidor, navegador, público, service_role)
   proxy.ts                      Renova a sessão e protege /admin (antigo "middleware")
@@ -134,7 +138,8 @@ tests/                          Vitest
 - **Admin** = logado **e** em `admin_users` (função `is_admin()`). Mesmo logado, o admin só consegue alterar o **status** de um pedido; valores, itens e dados da cliente ficam imutáveis. As transições de status são validadas por trigger, e o histórico é registrado automaticamente.
 - **Fotos:** bucket `images` com leitura pública pela URL, sem listagem pública; upload e exclusão só para admin. As fotos são redimensionadas e convertidas para WebP no navegador antes do upload.
 - Todas as entradas passam por **Zod** (no navegador para mensagens por campo e de novo no servidor).
-- **Cabeçalhos de segurança** em `next.config.ts`: Content Security Policy (o navegador só conversa com o próprio site, o Supabase e o ViaCEP), proteção contra o site ser embutido em outro (clickjacking), HSTS, `nosniff` e `Referrer-Policy`. **Ao adicionar um serviço usado no navegador** (ex.: gateway de pagamento, analytics), inclua o domínio dele na CSP, ou ele será bloqueado.
+- **Cabeçalhos de segurança** em `next.config.ts`: Content Security Policy (o navegador só conversa com o próprio site, o Supabase e o ViaCEP), proteção contra o site ser embutido em outro (clickjacking), HSTS, `nosniff` e `Referrer-Policy`. **Ao adicionar um serviço usado no navegador** (ex.: analytics), inclua o domínio dele na CSP, ou ele será bloqueado. (A InfinitePay não precisa: a cliente é *redirecionada* para o checkout dela, e toda a conversa com a API acontece no servidor.)
+- **Pagamento online:** a API da InfinitePay não tem chave secreta nem assina o webhook. Por isso nenhum aviso de fora é aceito sozinho: o servidor sempre consulta `payment_check` na InfinitePay e a função SQL `confirm_order_payment()` (só `service_role`) confere se o valor pago cobre o total antes de marcar o pedido como pago.
 - **Cookies:** o site público não grava cookies (o carrinho fica no `localStorage` do aparelho). Só o painel usa cookies, os de sessão do login, que são estritamente necessários. Por isso não há banner de cookies; se um dia entrar Google Analytics, Meta Pixel ou similar, será preciso pedir consentimento (LGPD).
 
 ### Loja aberta
@@ -146,6 +151,7 @@ tests/                          Vitest
 - Entrega: `Recebido → Confirmado → Saiu para entrega → Concluído`
 - Retirada: `Recebido → Confirmado → Pronto para retirada → Concluído`
 - `Cancelado` a partir de qualquer etapa antes de Concluído.
+- Pedido com pagamento online começa em `Aguardando pagamento` e só vai para `Recebido` quando o pagamento é confirmado (o painel não consegue “aprovar” um pedido não pago).
 
 A cada mudança, o botão **“Avisar cliente”** abre o WhatsApp da cliente com o texto daquele status (editável em Configurações → Mensagens; placeholders `{nome}`, `{numero}`, `{total}`, `{loja}`, `{endereco_retirada}` e `{link}`, que é o link de acompanhamento do pedido). A página do pedido da cliente se atualiza sozinha a cada 30 s.
 
@@ -157,13 +163,30 @@ O painel assina o Supabase Realtime (tabela `orders`, filtrada pelo RLS). Em cad
 
 Além disso, se `CALLMEBOT_RECIPIENTS` estiver definida, cada número da lista recebe no WhatsApp um resumo do pedido (primeiro nome, itens, total e link do painel), enviado pelo [CallMeBot](https://www.callmebot.com/blog/free-api-whatsapp-messages/) logo após a confirmação (`src/lib/notifications/notify-owner.ts`). Uma falha no envio nunca afeta o pedido; só aparece no log.
 
+### Pagamento online (InfinitePay)
+
+Usa o [Checkout Integrado da InfinitePay](https://www.infinitepay.io/checkout-documentacao): sem mensalidade; Pix com taxa zero e cartão (até 12x) com a taxa do plano da loja.
+
+| Recebimento | Formas de pagamento |
+|---|---|
+| **Entrega** | Só online (Pix ou cartão) |
+| **Retirada** | Online, ou Pix/cartão na retirada |
+
+**Fluxo:**
+
+1. `createOrder` cria o pedido em **Aguardando pagamento**, com prazo de **30 minutos**, e gera o link na InfinitePay (itens + taxa de entrega; `order_nsu` = id do pedido). A cliente vai direto para o checkout.
+2. Pago → a InfinitePay chama o **webhook** `/api/pagamentos/infinitepay` e manda a cliente de volta para `/pedido/[id]/pagamento`. **Os dois** conferem o pagamento (o que chegar primeiro confirma; o outro vê que já está pago). Se o webhook falhar, respondemos 400 e a InfinitePay reenvia.
+3. Confirmado → o pedido vai para **Recebido**, com selo **Pago**; o painel toca o alerta e a loja recebe o WhatsApp (CallMeBot).
+4. Não pago em 30 min → o `pg_cron` (job `expire-unpaid-orders`, a cada 5 min) **cancela** o pedido.
+5. Pagou depois de cancelado → o pedido fica **Cancelado + Pago** (“Pago após cancelar”, em vermelho no painel) e a loja é avisada para combinar com a cliente ou devolver o valor pelo app da InfinitePay.
+
+Enquanto aguarda pagamento, o pedido **não aparece** em “Em andamento” (tem o filtro próprio “Aguardando pagamento”) e não dispara alerta. Na página do pedido, a cliente vê o tempo restante e o botão **“Pagar agora”** (reabre o mesmo link).
+
+**Não há ambiente de testes na InfinitePay:** teste com um pedido real pequeno pago no Pix (taxa zero). O webhook só funciona no site publicado (a InfinitePay não alcança o `localhost`); localmente, a volta do checkout faz a confirmação.
+
 ---
 
 ## Próximas fases
-
-### Fase 2 — pagamento online
-- `orders` já tem `payment_status` (hoje sempre `pending`), `payment_provider` e `payment_reference`.
-- Adicionar: gerar a cobrança (Pix/cartão) no gateway logo após `createOrder`, um Route Handler de **webhook** (`src/app/api/webhooks/<gateway>/route.ts`) que valida a assinatura e marca `payment_status = 'paid'`, e ajustar as opções de pagamento no checkout.
 
 ### Fase 3 — WhatsApp Cloud API
 - Trocar **apenas** o final de `notifyCustomer()` em `src/lib/notifications/notify-customer.ts` pela chamada à API, devolvendo `{ channel: 'whatsapp_api', sent: true }`. O botão do painel já trata esse retorno (mostra “Mensagem enviada” em vez de abrir o WhatsApp).
