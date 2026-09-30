@@ -12,16 +12,18 @@ const TIMEOUT_MS = 10_000
  * Avisa a confeiteira no WhatsApp que chegou um pedido novo, via CallMeBot
  * (serviço gratuito que só envia mensagens para o próprio número cadastrado).
  *
- * Configuração: CALLMEBOT_PHONE (ex.: 5511999999999) e CALLMEBOT_APIKEY.
- * Sem elas, não faz nada. Nunca lança erro: uma falha aqui não pode afetar o pedido.
+ * Configuração: CALLMEBOT_RECIPIENTS com um ou mais pares "número:chave"
+ * separados por vírgula (ex.: 5511999999999:123456,5511988888888:654321);
+ * cada número ativa o bot no próprio celular e recebe a própria chave.
+ * Também aceita o formato antigo CALLMEBOT_PHONE + CALLMEBOT_APIKEY (um número só).
+ * Sem configuração, não faz nada. Nunca lança erro: uma falha aqui não pode afetar o pedido.
  *
  * Por privacidade (a mensagem passa por um serviço de terceiros), vão só o
  * primeiro nome da cliente, os itens e o total; telefone e endereço ficam no painel.
  */
 export async function notifyOwnerNewOrder(orderId: string): Promise<void> {
-  const phone = process.env.CALLMEBOT_PHONE?.replace(/\D/g, '')
-  const apiKey = process.env.CALLMEBOT_APIKEY?.trim()
-  if (!phone || !apiKey) return
+  const recipients = readRecipients()
+  if (recipients.length === 0) return
 
   try {
     const supabase = createServiceClient()
@@ -48,10 +50,44 @@ export async function notifyOwnerNewOrder(orderId: string): Promise<void> {
       `${getSiteUrl()}/admin/pedidos/${order.id}`,
     ].join('\n')
 
-    const url = `${CALLMEBOT_URL}?${new URLSearchParams({ phone, apikey: apiKey, text })}`
-    const res = await fetch(url, { signal: AbortSignal.timeout(TIMEOUT_MS), cache: 'no-store' })
-    if (!res.ok) throw new Error(`HTTP ${res.status}: ${(await res.text()).slice(0, 200)}`)
+    // Um número com problema não impede o envio para os outros.
+    const results = await Promise.allSettled(recipients.map((r) => sendCallMeBot(r, text)))
+    results.forEach((result, i) => {
+      if (result.status === 'rejected') {
+        console.error(`[notifyOwnerNewOrder] falha ao avisar ${maskPhone(recipients[i].phone)}`, result.reason)
+      }
+    })
   } catch (err) {
     console.error('[notifyOwnerNewOrder] falha ao avisar a loja', err)
   }
+}
+
+type Recipient = { phone: string; apiKey: string }
+
+function readRecipients(): Recipient[] {
+  const list = process.env.CALLMEBOT_RECIPIENTS?.trim()
+  if (list) {
+    return list
+      .split(',')
+      .map((entry) => {
+        const [phone = '', apiKey = ''] = entry.split(':')
+        return { phone: phone.replace(/\D/g, ''), apiKey: apiKey.trim() }
+      })
+      .filter((r) => r.phone && r.apiKey)
+  }
+
+  const phone = process.env.CALLMEBOT_PHONE?.replace(/\D/g, '')
+  const apiKey = process.env.CALLMEBOT_APIKEY?.trim()
+  return phone && apiKey ? [{ phone, apiKey }] : []
+}
+
+async function sendCallMeBot({ phone, apiKey }: Recipient, text: string): Promise<void> {
+  const url = `${CALLMEBOT_URL}?${new URLSearchParams({ phone, apikey: apiKey, text })}`
+  const res = await fetch(url, { signal: AbortSignal.timeout(TIMEOUT_MS), cache: 'no-store' })
+  if (!res.ok) throw new Error(`HTTP ${res.status}: ${(await res.text()).slice(0, 200)}`)
+}
+
+/** Só os 4 últimos dígitos no log. */
+function maskPhone(phone: string): string {
+  return `…${phone.slice(-4)}`
 }
