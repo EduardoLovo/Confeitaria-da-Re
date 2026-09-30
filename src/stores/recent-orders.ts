@@ -28,7 +28,7 @@ type State = {
   remember: (order: RecentOrder) => void
 }
 
-const statusSchema = z.enum(['received', 'confirmed', 'out_for_delivery', 'ready_for_pickup', 'completed', 'cancelled'])
+const statusSchema = z.enum(['awaiting_payment', 'received','confirmed', 'out_for_delivery', 'ready_for_pickup', 'completed', 'cancelled'])
 const persistedSchema = z.object({
   orders: z
     .array(

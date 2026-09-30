@@ -64,6 +64,6 @@ describe('link de acompanhamento nas mensagens padrão', () => {
         trackingUrl: 'https://x/pedido/1',
       }).includes('https://x/pedido/1'),
     )
-    expect(withLink).toEqual(['received', 'confirmed', 'out_for_delivery', 'ready_for_pickup'])
+    expect(withLink).toEqual(['awaiting_payment', 'received', 'confirmed', 'out_for_delivery', 'ready_for_pickup'])
   })
 })

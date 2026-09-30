@@ -4,12 +4,22 @@ import { after } from 'next/server'
 import { z } from 'zod'
 
 import { notifyOwnerNewOrder } from '@/lib/notifications/notify-owner'
+import { ensurePaymentLink } from '@/lib/payments/online-payment'
 import { requestIpHash } from '@/lib/security/ip-hash'
 import { createServiceClient } from '@/lib/supabase/admin'
 import { checkoutSchema, fieldErrors, toCreateOrderPayload } from '@/lib/validation/order'
 
 export type CreateOrderResult =
-  | { ok: true; orderId: string; orderNumber: number }
+  | {
+      ok: true
+      orderId: string
+      orderNumber: number
+      /**
+       * Pedido online: link do checkout da InfinitePay para onde a cliente vai.
+       * null se o link não pôde ser criado agora; a página do pedido tenta de novo.
+       */
+      paymentUrl: string | null
+    }
   | {
       ok: false
       message: string
@@ -20,7 +30,7 @@ export type CreateOrderResult =
       refresh?: boolean
     }
 
-const rpcResultSchema = z.object({ id: z.uuid(), number: z.number().int() })
+const rpcResultSchema = z.object({ id: z.uuid(), number: z.number().int(), requires_payment: z.boolean() })
 
 const FRIENDLY_ERRORS: Record<string, { message: string; refresh?: boolean }> = {
   STORE_CLOSED: {
@@ -87,8 +97,21 @@ export async function createOrder(input: unknown): Promise<CreateOrderResult> {
     return { ok: false, message: 'Não conseguimos registrar seu pedido. Tente novamente.' }
   }
 
-  // Depois da resposta, para a cliente não esperar o WhatsApp da loja.
-  after(() => notifyOwnerNewOrder(result.data.id))
+  const { id, number, requires_payment } = result.data
 
-  return { ok: true, orderId: result.data.id, orderNumber: result.data.number }
+  if (!requires_payment) {
+    // Depois da resposta, para a cliente não esperar o WhatsApp da loja.
+    // Pedido online só avisa a loja quando o pagamento é confirmado.
+    after(() => notifyOwnerNewOrder(id))
+    return { ok: true, orderId: id, orderNumber: number, paymentUrl: null }
+  }
+
+  let paymentUrl: string | null = null
+  try {
+    const link = await ensurePaymentLink(id)
+    if (link.ok) paymentUrl = link.url
+  } catch (err) {
+    console.error('[createOrder] não foi possível criar o link de pagamento', { orderId: id }, err)
+  }
+  return { ok: true, orderId: id, orderNumber: number, paymentUrl }
 }

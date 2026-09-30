@@ -20,8 +20,14 @@ const TIMEOUT_MS = 10_000
  *
  * Por privacidade (a mensagem passa por um serviço de terceiros), vão só o
  * primeiro nome da cliente, os itens e o total; telefone e endereço ficam no painel.
+ *
+ * Pedido online só é avisado quando o pagamento é confirmado. `paidAfterCancel`:
+ * o pagamento chegou depois de o pedido expirar; a loja precisa decidir o que fazer.
  */
-export async function notifyOwnerNewOrder(orderId: string): Promise<void> {
+export async function notifyOwnerNewOrder(
+  orderId: string,
+  { paidAfterCancel = false }: { paidAfterCancel?: boolean } = {},
+): Promise<void> {
   const recipients = readRecipients()
   if (recipients.length === 0) return
 
@@ -29,7 +35,9 @@ export async function notifyOwnerNewOrder(orderId: string): Promise<void> {
     const supabase = createServiceClient()
     const { data: order, error } = await supabase
       .from('orders')
-      .select('id, number, customer_name, fulfillment, total_cents, payment_method, order_items(name_snapshot, quantity, sort_order)')
+      .select(
+        'id, number, customer_name, fulfillment, total_cents, payment_method, payment_status, payment_capture_method, order_items(name_snapshot, quantity, sort_order)',
+      )
       .eq('id', orderId)
       .single()
     if (error) throw new Error(error.message)
@@ -39,10 +47,17 @@ export async function notifyOwnerNewOrder(orderId: string): Promise<void> {
       .map((item) => `• ${item.quantity}x ${item.name_snapshot}`)
     const firstName = order.customer_name.trim().split(/\s+/)[0]
 
+    const payment =
+      order.payment_status === 'paid'
+        ? `✅ Pago online${order.payment_capture_method === 'pix' ? ' (Pix)' : order.payment_capture_method === 'credit_card' ? ' (cartão)' : ''}`
+        : paymentLabel(order.payment_method, order.fulfillment)
+
     const text = [
-      `🧁 *Novo pedido #${order.number}*`,
+      paidAfterCancel
+        ? `⚠️ *Pagamento recebido do pedido #${order.number}, que já tinha sido CANCELADO* (passou do prazo). Veja no painel se aceita o pedido ou devolve o valor.`
+        : `🧁 *Novo pedido #${order.number}*`,
       `Cliente: ${firstName}`,
-      `${FULFILLMENT_LABEL[order.fulfillment]} · ${paymentLabel(order.payment_method, order.fulfillment)}`,
+      `${FULFILLMENT_LABEL[order.fulfillment]} · ${payment}`,
       '',
       ...items,
       '',
