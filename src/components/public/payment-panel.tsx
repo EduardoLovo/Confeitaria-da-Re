@@ -88,7 +88,7 @@ export function PaymentPanel({ orderId, totalCents, expiresAt, returnedUnpaid }:
       )}
       <p className="flex items-center gap-2 text-xs text-muted-foreground">
         <ShieldCheck className="size-4 shrink-0" aria-hidden />
-        Pix ou cartão em até 12x, pelo checkout seguro da InfinitePay.
+        Pix ou cartão, pelo checkout seguro da InfinitePay.
       </p>
     </section>
   )

@@ -77,7 +77,7 @@ function paymentOptionTitle(method: AcceptedPaymentMethod, fulfillment: Fulfillm
 }
 
 function paymentOptionDetail(method: AcceptedPaymentMethod): string | undefined {
-  return method === 'online' ? 'Pix ou cartão em até 12x, pelo checkout seguro da InfinitePay' : undefined
+  return method === 'online' ? 'Pix ou cartão, pelo checkout seguro da InfinitePay' : undefined
 }
 
 // Ordem em que o foco procura o primeiro campo com erro.
