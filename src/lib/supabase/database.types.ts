@@ -8,13 +8,14 @@ type Timestamps = { created_at: string; updated_at: string }
 
 export type FulfillmentType = 'delivery' | 'pickup'
 export type OrderStatus =
+  | 'awaiting_payment'
   | 'received'
   | 'confirmed'
   | 'out_for_delivery'
   | 'ready_for_pickup'
   | 'completed'
   | 'cancelled'
-export type PaymentMethod = 'pix_on_delivery' | 'cash' | 'card_on_delivery'
+export type PaymentMethod = 'pix_on_delivery' | 'cash' | 'card_on_delivery' | 'online'
 export type PaymentStatus = 'pending' | 'paid' | 'refunded' | 'not_applicable'
 
 type StoreSettingsRow = {
@@ -92,6 +93,12 @@ type OrderRow = {
   payment_status: PaymentStatus
   payment_provider: string | null
   payment_reference: string | null
+  payment_url: string | null
+  payment_expires_at: string | null
+  paid_at: string | null
+  paid_amount_cents: number | null
+  payment_capture_method: string | null
+  payment_receipt_url: string | null
   notes: string | null
   status: OrderStatus
   wants_whatsapp_updates: boolean
@@ -215,6 +222,17 @@ export type Database = {
       is_admin_member: { Args: never; Returns: boolean }
       is_store_open_now: { Args: never; Returns: boolean }
       create_order: { Args: { payload: Json }; Returns: Json }
+      confirm_order_payment: {
+        Args: {
+          p_order_id: string
+          p_transaction_nsu: string
+          p_paid_amount_cents: number
+          p_capture_method?: string | null
+          p_receipt_url?: string | null
+        }
+        Returns: Json
+      }
+      expire_unpaid_orders: { Args: never; Returns: number }
     }
     Enums: {
       fulfillment_type: FulfillmentType

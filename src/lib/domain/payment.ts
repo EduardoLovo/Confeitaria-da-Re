@@ -19,6 +19,8 @@ export function paymentLabel(method: PaymentMethod, fulfillment?: FulfillmentTyp
       return 'Dinheiro'
     case 'card_on_delivery':
       return `Cartão ${when}`
+    case 'online':
+      return 'Online (Pix ou cartão)'
   }
 }
 

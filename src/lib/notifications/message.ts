@@ -12,6 +12,7 @@ export type MessageStore = { name: string; pickup_address: string | null }
 
 /** Usados se a loja ainda não tiver cadastrado o texto daquele status. */
 export const DEFAULT_TEMPLATES: Record<OrderStatus, string> = {
+  awaiting_payment: 'Oi, {nome}! Seu pedido #{numero} está aguardando o pagamento de {total}.\n\nPague ou acompanhe: {link}',
   received: 'Oi, {nome}! Recebemos seu pedido #{numero} 💕 Já já confirmamos por aqui.\n\nAcompanhe: {link}',
   confirmed:
     'Oi, {nome}! Seu pedido #{numero} foi confirmado e já está sendo preparado com carinho 🍫 Total: {total}.\n\nAcompanhe: {link}',

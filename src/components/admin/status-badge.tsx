@@ -4,6 +4,7 @@ import { STATUS_LABEL } from '@/lib/domain/order-status'
 import type { OrderStatus } from '@/lib/supabase/database.types'
 
 const STYLES: Record<OrderStatus, string> = {
+  awaiting_payment: 'bg-muted text-muted-foreground',
   received: 'bg-rose text-cocoa',
   confirmed: 'bg-amber-100 text-amber-900',
   out_for_delivery: 'bg-sky-100 text-sky-900',

@@ -40,6 +40,9 @@ const FRIENDLY_ERRORS: Record<string, { message: string; refresh?: boolean }> = 
     message: 'Confira o endereço de entrega.',
   },
   INVALID_CHANGE: { message: 'O valor do troco precisa ser maior que o total do pedido.' },
+  PAYMENT_METHOD_NOT_ALLOWED: {
+    message: 'Para entrega, o pagamento é feito online (Pix ou cartão). Escolha essa opção para continuar.',
+  },
   INVALID_ITEMS: { message: 'Há algum problema com os itens do carrinho. Revise e tente de novo.' },
 }
 

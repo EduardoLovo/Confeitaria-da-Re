@@ -4,6 +4,7 @@ import type { FulfillmentType, OrderStatus } from '@/lib/supabase/database.types
 // O banco é quem garante a regra; aqui é só para a UI mostrar os botões certos.
 
 export const STATUS_LABEL: Record<OrderStatus, string> = {
+  awaiting_payment: 'Aguardando pagamento',
   received: 'Recebido',
   confirmed: 'Confirmado',
   out_for_delivery: 'Saiu para entrega',
