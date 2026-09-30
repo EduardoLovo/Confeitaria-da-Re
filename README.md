@@ -55,6 +55,7 @@ Em **Supabase → Project Settings → API Keys** e **Data API**:
 | `SUPABASE_SERVICE_ROLE_KEY` | **somente servidor** | Chave **secret** (`sb_secret_…`) ou a antiga **service_role**. Ignora o RLS: nunca exponha no navegador nem use o prefixo `NEXT_PUBLIC_` |
 | `SITE_URL` | servidor (opcional) | Endereço público do site para o link de acompanhamento nas mensagens (`{link}`). Na Vercel o domínio de produção é detectado sozinho; preencha se usar domínio próprio, ex.: `https://www.confeitariadare.com.br` |
 | `RATE_LIMIT_SALT` | servidor | Texto aleatório longo para o hash de IP do limite de pedidos. Gere com `node -e "console.log(require('crypto').randomBytes(32).toString('hex'))"` |
+| `CALLMEBOT_PHONE` / `CALLMEBOT_APIKEY` | servidor (opcional) | WhatsApp da loja (DDI+DDD, só dígitos) e chave do CallMeBot para o aviso de pedido novo. Sem elas, o aviso não é enviado |
 
 ---
 
@@ -153,6 +154,8 @@ A cada mudança, o botão **“Avisar cliente”** abre o WhatsApp da cliente co
 ### Pedidos em tempo real
 
 O painel assina o Supabase Realtime (tabela `orders`, filtrada pelo RLS). Em cada pedido novo: som (toque em **“Ativar som”** uma vez, exigência dos navegadores), vibração no celular, aviso na tela, contador no título da aba e notificação do sistema se permitida. O indicador **Ao vivo / Offline** mostra a conexão; como rede de segurança, a lista também se atualiza a cada minuto.
+
+Além disso, se `CALLMEBOT_PHONE` e `CALLMEBOT_APIKEY` estiverem definidas, a loja recebe no WhatsApp um resumo do pedido (primeiro nome, itens, total e link do painel), enviado pelo [CallMeBot](https://www.callmebot.com/blog/free-api-whatsapp-messages/) logo após a confirmação (`src/lib/notifications/notify-owner.ts`). Uma falha no envio nunca afeta o pedido; só aparece no log.
 
 ---
 

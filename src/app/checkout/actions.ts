@@ -1,7 +1,9 @@
 'use server'
 
+import { after } from 'next/server'
 import { z } from 'zod'
 
+import { notifyOwnerNewOrder } from '@/lib/notifications/notify-owner'
 import { requestIpHash } from '@/lib/security/ip-hash'
 import { createServiceClient } from '@/lib/supabase/admin'
 import { checkoutSchema, fieldErrors, toCreateOrderPayload } from '@/lib/validation/order'
@@ -81,6 +83,9 @@ export async function createOrder(input: unknown): Promise<CreateOrderResult> {
     console.error('[createOrder] resposta inesperada de create_order', data)
     return { ok: false, message: 'Não conseguimos registrar seu pedido. Tente novamente.' }
   }
+
+  // Depois da resposta, para a cliente não esperar o WhatsApp da loja.
+  after(() => notifyOwnerNewOrder(result.data.id))
 
   return { ok: true, orderId: result.data.id, orderNumber: result.data.number }
 }
