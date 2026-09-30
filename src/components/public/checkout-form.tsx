@@ -13,7 +13,12 @@ import { Label } from '@/components/ui/label'
 import { Textarea } from '@/components/ui/textarea'
 import { resolveCart } from '@/lib/domain/cart'
 import type { ProductMap } from '@/lib/domain/catalog'
-import { ACCEPTED_PAYMENT_METHODS, paymentLabel, type AcceptedPaymentMethod } from '@/lib/domain/payment'
+import {
+  ONLINE_PAYMENT_WINDOW_MINUTES,
+  paymentLabel,
+  paymentMethodsFor,
+  type AcceptedPaymentMethod,
+} from '@/lib/domain/payment'
 import { missingForMinimum } from '@/lib/domain/pricing'
 import { formatBRL, maskCEP, maskPhoneBR, onlyDigits } from '@/lib/format'
 import type { FulfillmentType } from '@/lib/supabase/database.types'
@@ -62,8 +67,17 @@ const EMPTY: Form = {
 }
 
 const PAYMENT_ICON: Record<AcceptedPaymentMethod, ReactNode> = {
+  online: <ShieldCheck />,
   pix_on_delivery: <QrCode />,
   card_on_delivery: <CreditCard />,
+}
+
+function paymentOptionTitle(method: AcceptedPaymentMethod, fulfillment: FulfillmentType): string {
+  return method === 'online' ? 'Pagar agora online' : paymentLabel(method, fulfillment)
+}
+
+function paymentOptionDetail(method: AcceptedPaymentMethod): string | undefined {
+  return method === 'online' ? 'Pix ou cartão em até 12x, pelo checkout seguro da InfinitePay' : undefined
 }
 
 // Ordem em que o foco procura o primeiro campo com erro.
@@ -95,10 +109,21 @@ export function CheckoutForm(props: Props) {
   const [formError, setFormError] = useState<string | null>(null)
   const [cepStatus, setCepStatus] = useState<'idle' | 'loading' | 'notFound'>('idle')
   const [pending, startTransition] = useTransition()
-  const [placed, setPlaced] = useState(false)
+  /** Depois do pedido: abrindo a confirmação ou indo para o pagamento. */
+  const [placed, setPlaced] = useState<'confirmation' | 'payment' | null>(null)
   const errorBoxRef = useRef<HTMLDivElement>(null)
 
   const cepRequest = useRef<AbortController | null>(null)
+
+  /** Entrega só tem pagamento online: já deixa marcado. Na retirada, a cliente escolhe. */
+  function chooseFulfillment(fulfillment: FulfillmentType) {
+    set('fulfillment', fulfillment)
+    const allowed = paymentMethodsFor(fulfillment)
+    setForm((f) => ({
+      ...f,
+      paymentMethod: allowed.length === 1 ? allowed[0] : f.paymentMethod,
+    }))
+  }
 
   const set = <K extends keyof Form>(key: K, value: Form[K]) => {
     setForm((f) => ({ ...f, [key]: value }))
@@ -186,14 +211,22 @@ export function CheckoutForm(props: Props) {
     startTransition(async () => {
       const result = await createOrder(input)
       if (result.ok) {
-        setPlaced(true)
+        const online = parsed.data.paymentMethod === 'online'
         rememberOrder({
           id: result.orderId,
           number: result.orderNumber,
           createdAt: new Date().toISOString(),
-          status: 'received',
+          status: online ? 'awaiting_payment' : 'received',
         })
         clearCart()
+        if (result.paymentUrl) {
+          setPlaced('payment')
+          // Checkout da InfinitePay (outro site): volta para /pedido/[id]/pagamento.
+          window.location.assign(result.paymentUrl)
+          return
+        }
+        // Sem link agora (falha na InfinitePay): a página do pedido tem o "Pagar agora".
+        setPlaced('confirmation')
         router.replace(`/pedido/${result.orderId}`)
         return
       }
@@ -208,7 +241,9 @@ export function CheckoutForm(props: Props) {
     return (
       <div className="flex flex-col items-center gap-3 py-20 text-center" role="status">
         <Loader2 className="size-8 animate-spin text-cocoa" aria-hidden />
-        <p className="font-semibold">Pedido enviado! Abrindo a confirmação…</p>
+        <p className="font-semibold">
+          {placed === 'payment' ? 'Pedido registrado! Abrindo o pagamento…' : 'Pedido enviado! Abrindo a confirmação…'}
+        </p>
       </div>
     )
   }
@@ -277,7 +312,7 @@ export function CheckoutForm(props: Props) {
           <RadioCard
             name="fulfillment"
             checked={form.fulfillment === 'delivery'}
-            onChange={() => set('fulfillment', 'delivery')}
+            onChange={() => chooseFulfillment('delivery')}
             icon={<Truck />}
             title="Entrega"
             detail={deliveryFeeCents > 0 ? formatBRL(deliveryFeeCents) : 'Grátis'}
@@ -285,7 +320,7 @@ export function CheckoutForm(props: Props) {
           <RadioCard
             name="fulfillment"
             checked={form.fulfillment === 'pickup'}
-            onChange={() => set('fulfillment', 'pickup')}
+            onChange={() => chooseFulfillment('pickup')}
             icon={<Store />}
             title="Retirada"
             detail="Grátis"
@@ -399,28 +434,50 @@ export function CheckoutForm(props: Props) {
       </Section>
 
       {/* ---------- pagamento ---------- */}
-      <Section title="Pagamento" description="O pagamento é feito na entrega ou na retirada.">
-        <fieldset
-          id="f-paymentMethod"
-          tabIndex={-1}
-          aria-invalid={Boolean(errors.paymentMethod)}
-          aria-describedby={errors.paymentMethod ? 'e-paymentMethod' : undefined}
-          className="grid gap-2 outline-none"
-        >
-          <legend className="sr-only">Forma de pagamento</legend>
-          {ACCEPTED_PAYMENT_METHODS.map((method) => (
-            <RadioCard
-              key={method}
-              name="paymentMethod"
-              checked={form.paymentMethod === method}
-              onChange={() => set('paymentMethod', method)}
-              icon={PAYMENT_ICON[method]}
-              title={paymentLabel(method, form.fulfillment || undefined)}
-              inline
-            />
-          ))}
-        </fieldset>
+      <Section
+        title="Pagamento"
+        description={
+          form.fulfillment === 'delivery'
+            ? 'Para entrega, o pagamento é feito agora, online.'
+            : form.fulfillment === 'pickup'
+              ? 'Pague agora online ou na hora da retirada.'
+              : undefined
+        }
+      >
+        {form.fulfillment ? (
+          <fieldset
+            id="f-paymentMethod"
+            tabIndex={-1}
+            aria-invalid={Boolean(errors.paymentMethod)}
+            aria-describedby={errors.paymentMethod ? 'e-paymentMethod' : undefined}
+            className="grid gap-2 outline-none"
+          >
+            <legend className="sr-only">Forma de pagamento</legend>
+            {paymentMethodsFor(form.fulfillment).map((method) => (
+              <RadioCard
+                key={method}
+                name="paymentMethod"
+                checked={form.paymentMethod === method}
+                onChange={() => set('paymentMethod', method)}
+                icon={PAYMENT_ICON[method]}
+                title={paymentOptionTitle(method, form.fulfillment as FulfillmentType)}
+                detail={paymentOptionDetail(method)}
+                inline
+              />
+            ))}
+          </fieldset>
+        ) : (
+          <p id="f-paymentMethod" tabIndex={-1} className="text-sm text-muted-foreground outline-none">
+            Escolha entrega ou retirada para ver as formas de pagamento.
+          </p>
+        )}
         <FieldError id="paymentMethod" error={errors.paymentMethod} />
+        {form.paymentMethod === 'online' && (
+          <p className="rounded-xl bg-secondary/60 p-3 text-sm">
+            Ao fazer o pedido, você vai para a página de pagamento. Seu pedido é confirmado assim que o pagamento
+            for aprovado; você tem <strong>{ONLINE_PAYMENT_WINDOW_MINUTES} minutos</strong> para pagar.
+          </p>
+        )}
       </Section>
 
       {/* ---------- observações ---------- */}
@@ -518,6 +575,8 @@ export function CheckoutForm(props: Props) {
             </>
           ) : !isOpen ? (
             'Loja fechada'
+          ) : form.paymentMethod === 'online' ? (
+            <>Ir para o pagamento · {formatBRL(totalCents)}</>
           ) : (
             <>Fazer pedido · {formatBRL(totalCents)}</>
           )}

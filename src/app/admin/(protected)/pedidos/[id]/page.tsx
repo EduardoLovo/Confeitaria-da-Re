@@ -5,11 +5,12 @@ import { notFound } from 'next/navigation'
 import type { ReactNode } from 'react'
 import { z } from 'zod'
 
+import { PaymentBadge } from '@/components/admin/payment-badge'
 import { StatusBadge } from '@/components/admin/status-badge'
 import { requireAdminPage } from '@/lib/auth'
 import { STATUS_LABEL } from '@/lib/domain/order-status'
 import { paymentLabel } from '@/lib/domain/payment'
-import { formatBRL, formatDateTime, maskCEP, maskPhoneBR } from '@/lib/format'
+import { formatBRL, formatDateTime, formatTime, maskCEP, maskPhoneBR } from '@/lib/format'
 import { waLink } from '@/lib/whatsapp/wa-link'
 import { StatusActions } from './status-actions'
 
@@ -44,11 +45,33 @@ export default async function OrderDetailPage({ params }: PageProps<'/admin/pedi
       <header className="flex flex-wrap items-center gap-3">
         <h1 className="text-3xl font-semibold text-cocoa">Pedido #{order.number}</h1>
         <StatusBadge status={order.status} className="h-7 text-sm" />
+        <PaymentBadge
+          status={order.status}
+          paymentMethod={order.payment_method}
+          paymentStatus={order.payment_status}
+          className="h-7 text-sm"
+        />
         <p className="w-full text-sm text-muted-foreground">
           {formatDateTime(order.created_at)} · {isDelivery ? 'Entrega' : 'Retirada'}
           {order.wants_whatsapp_updates && ' · 💬 quer acompanhar pelo WhatsApp'}
         </p>
       </header>
+
+      {order.status === 'awaiting_payment' && order.payment_expires_at && (
+        <p className="rounded-2xl bg-secondary p-4 text-sm" role="status">
+          Aguardando o pagamento online até <strong>{formatTime(order.payment_expires_at)}</strong>. Quando for pago,
+          o pedido entra sozinho em “Recebido” e você é avisada. Se não for pago até lá, ele é cancelado
+          automaticamente.
+        </p>
+      )}
+
+      {order.status === 'cancelled' && order.payment_status === 'paid' && (
+        <p className="rounded-2xl border-2 border-destructive bg-destructive/10 p-4 text-sm" role="alert">
+          <strong>Pagamento recebido depois do cancelamento.</strong> A cliente pagou{' '}
+          {formatBRL(order.paid_amount_cents ?? order.total_cents)} quando o prazo já tinha acabado. Fale com ela
+          pelo WhatsApp para combinar o pedido ou devolver o valor pelo app da InfinitePay.
+        </p>
+      )}
 
       <StatusActions
         orderId={order.id}
@@ -124,7 +147,41 @@ export default async function OrderDetailPage({ params }: PageProps<'/admin/pedi
 
       <div className="grid gap-4 md:grid-cols-2">
         <Card title="Pagamento">
-          <p className="font-semibold">{paymentLabel(order.payment_method, order.fulfillment)}</p>
+          {order.payment_status === 'paid' ? (
+            <>
+              <p className="font-semibold text-success">
+                ✅ Pago online
+                {order.payment_capture_method === 'pix'
+                  ? ' via Pix'
+                  : order.payment_capture_method === 'credit_card'
+                    ? ' no cartão'
+                    : ''}
+              </p>
+              <dl className="space-y-1">
+                {order.paid_amount_cents !== null && (
+                  <Row label="Valor pago" value={formatBRL(order.paid_amount_cents)} />
+                )}
+                {order.paid_at && <Row label="Pago em" value={formatDateTime(order.paid_at)} />}
+                {order.payment_reference && <Row label="Transação" value={order.payment_reference} />}
+              </dl>
+              {order.payment_receipt_url && (
+                <a
+                  href={order.payment_receipt_url}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="font-semibold text-cocoa underline underline-offset-4"
+                >
+                  Ver comprovante
+                </a>
+              )}
+            </>
+          ) : (
+            <p className="font-semibold">
+              {order.payment_method === 'online'
+                ? 'Online · pagamento não confirmado'
+                : `${paymentLabel(order.payment_method, order.fulfillment)} · a receber`}
+            </p>
+          )}
           {order.change_for_cents && (
             <p>
               Troco para <strong>{formatBRL(order.change_for_cents)}</strong> (levar{' '}

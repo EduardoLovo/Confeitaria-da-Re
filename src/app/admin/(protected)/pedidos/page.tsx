@@ -3,6 +3,7 @@ import type { Metadata } from 'next'
 import Link from 'next/link'
 import { cn } from 'cn'
 
+import { PaymentBadge } from '@/components/admin/payment-badge'
 import { StatusBadge } from '@/components/admin/status-badge'
 import { requireAdminPage } from '@/lib/auth'
 import { FINAL_STATUSES, STATUS_LABEL } from '@/lib/domain/order-status'
@@ -18,6 +19,7 @@ const FILTERS: { value: string; label: string }[] = [
   { value: 'saiu', label: 'Saiu / Pronto' },
   { value: 'completed', label: STATUS_LABEL.completed },
   { value: 'cancelled', label: STATUS_LABEL.cancelled },
+  { value: 'awaiting_payment', label: STATUS_LABEL.awaiting_payment },
   { value: 'todos', label: 'Todos' },
 ]
 
@@ -31,8 +33,10 @@ function statusesFor(filter: string): OrderStatus[] | null {
     case 'confirmed':
     case 'completed':
     case 'cancelled':
+    case 'awaiting_payment':
       return [filter]
     default:
+      // "Aguardando pagamento" fica de fora: só entra na fila depois de pago.
       return ['received', 'confirmed', 'out_for_delivery', 'ready_for_pickup']
   }
 }
@@ -45,7 +49,9 @@ export default async function OrdersPage({ searchParams }: PageProps<'/admin/ped
 
   let query = supabase
     .from('orders')
-    .select('id, number, customer_name, fulfillment, zone_name_snapshot, total_cents, status, created_at')
+    .select(
+      'id, number, customer_name, fulfillment, zone_name_snapshot, total_cents, status, created_at, payment_method, payment_status',
+    )
     .order('created_at', { ascending: false })
     .limit(100)
   if (statuses) query = query.in('status', statuses)
@@ -89,7 +95,9 @@ export default async function OrdersPage({ searchParams }: PageProps<'/admin/ped
                   className={cn(
                     'flex items-center gap-3 rounded-2xl border bg-card p-3 transition hover:shadow-sm focus-visible:ring-3 focus-visible:ring-ring/50 focus-visible:outline-none',
                     o.status === 'received' && 'border-rose ring-2 ring-rose/50',
-                    FINAL_STATUSES.includes(o.status) && 'opacity-75',
+                    o.status === 'cancelled' && o.payment_status === 'paid'
+                      ? 'border-destructive ring-2 ring-destructive/40'
+                      : (FINAL_STATUSES.includes(o.status) || o.status === 'awaiting_payment') && 'opacity-75',
                   )}
                 >
                   <span
@@ -111,7 +119,15 @@ export default async function OrdersPage({ searchParams }: PageProps<'/admin/ped
                   </span>
                   <span className="flex shrink-0 flex-col items-end gap-1">
                     <StatusBadge status={o.status} />
-                    <span className="text-sm font-semibold tabular-nums">{formatBRL(o.total_cents)}</span>
+                    <span className="flex items-center gap-1.5">
+                      <PaymentBadge
+                        status={o.status}
+                        paymentMethod={o.payment_method}
+                        paymentStatus={o.payment_status}
+                        className="h-5 px-2 text-[0.7rem]"
+                      />
+                      <span className="text-sm font-semibold tabular-nums">{formatBRL(o.total_cents)}</span>
+                    </span>
                   </span>
                 </Link>
               </li>

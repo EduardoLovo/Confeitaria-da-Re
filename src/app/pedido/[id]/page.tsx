@@ -1,4 +1,4 @@
-import { CircleCheck, MapPin, Store } from 'lucide-react'
+import { CircleCheck, CircleX, Clock, MapPin, Store } from 'lucide-react'
 import type { Metadata } from 'next'
 import Link from 'next/link'
 import { notFound } from 'next/navigation'
@@ -6,6 +6,7 @@ import type { ReactNode } from 'react'
 
 import { AutoRefresh } from '@/components/public/auto-refresh'
 import { OrderProgress } from '@/components/public/order-progress'
+import { PaymentPanel } from '@/components/public/payment-panel'
 import { RememberOrder } from '@/components/public/remember-order'
 import { WhatsappFollowButton } from '@/components/public/whatsapp-follow-button'
 import { getPublicOrder } from '@/lib/data/orders'
@@ -21,25 +22,38 @@ export const metadata: Metadata = {
   robots: { index: false, follow: false },
 }
 
-export default async function OrderPage({ params }: PageProps<'/pedido/[id]'>) {
+export default async function OrderPage({ params, searchParams }: PageProps<'/pedido/[id]'>) {
   const { id } = await params
+  const { pagamento } = await searchParams
   const [order, store] = await Promise.all([getPublicOrder(id), getStoreInfo()])
   if (!order) notFound()
 
   const firstName = order.customer_name.split(/\s+/)[0]
   const isFinal = FINAL_STATUSES.includes(order.status)
+  const awaitingPayment = order.status === 'awaiting_payment'
+  const paidOnline = order.payment_method === 'online' && order.payment_status === 'paid'
   const followHref = waLink(store.settings.whatsapp, `Olá! Quero acompanhar meu pedido #${order.number}`)
 
   return (
     <main className="mx-auto flex w-full max-w-xl flex-1 flex-col gap-5 px-4 pt-8 pb-12">
-      {/* Enquanto o pedido anda, a página se atualiza sozinha. */}
-      {!isFinal && <AutoRefresh intervalMs={30_000} />}
+      {/* Enquanto o pedido anda, a página se atualiza sozinha (mais rápido esperando o pagamento). */}
+      {!isFinal && <AutoRefresh intervalMs={awaitingPayment ? 10_000 : 30_000} />}
       <RememberOrder id={order.id} number={order.number} createdAt={order.created_at} status={order.status} />
 
       <header className="flex flex-col items-center gap-2 text-center">
-        <CircleCheck className="size-14 text-success" aria-hidden />
+        {awaitingPayment ? (
+          <Clock className="size-14 text-cocoa" aria-hidden />
+        ) : order.status === 'cancelled' ? (
+          <CircleX className="size-14 text-destructive" aria-hidden />
+        ) : (
+          <CircleCheck className="size-14 text-success" aria-hidden />
+        )}
         <h1 className="text-3xl font-semibold text-cocoa">
-          {order.status === 'cancelled' ? 'Pedido cancelado' : `Obrigada, ${firstName}!`}
+          {order.status === 'cancelled'
+            ? 'Pedido cancelado'
+            : awaitingPayment
+              ? `Quase lá, ${firstName}!`
+              : `Obrigada, ${firstName}!`}
         </h1>
         <p className="text-muted-foreground">
           Pedido <strong className="text-foreground">#{order.number}</strong> ·{' '}
@@ -50,7 +64,29 @@ export default async function OrderPage({ params }: PageProps<'/pedido/[id]'>) {
         </p>
       </header>
 
-      {!isFinal && (
+      {awaitingPayment && order.payment_expires_at && (
+        <PaymentPanel
+          orderId={order.id}
+          totalCents={order.total_cents}
+          expiresAt={order.payment_expires_at}
+          returnedUnpaid={pagamento === 'pendente'}
+        />
+      )}
+
+      {order.status === 'cancelled' && order.payment_method === 'online' && (
+        <p className="rounded-2xl bg-secondary p-4 text-sm" role="status">
+          {paidOnline ? (
+            <>
+              Recebemos o seu pagamento depois do prazo, quando o pedido já tinha sido cancelado. Vamos falar com você
+              pelo WhatsApp para combinar o pedido ou devolver o valor.
+            </>
+          ) : (
+            <>O pagamento não foi concluído dentro do prazo, então o pedido foi cancelado. Você pode fazer um novo pedido quando quiser.</>
+          )}
+        </p>
+      )}
+
+      {!isFinal && !awaitingPayment && (
         <WhatsappFollowButton
           orderId={order.id}
           href={followHref}
@@ -58,9 +94,11 @@ export default async function OrderPage({ params }: PageProps<'/pedido/[id]'>) {
         />
       )}
 
-      <Card title="Andamento">
-        <OrderProgress status={order.status} fulfillment={order.fulfillment} />
-      </Card>
+      {!awaitingPayment && (
+        <Card title="Andamento">
+          <OrderProgress status={order.status} fulfillment={order.fulfillment} />
+        </Card>
+      )}
 
       <Card title="Itens">
         <ul className="space-y-2 text-sm">
@@ -111,9 +149,28 @@ export default async function OrderPage({ params }: PageProps<'/pedido/[id]'>) {
           </div>
         )}
         <dl className="space-y-1 border-t pt-3 text-sm">
-          <Row label="Pagamento" value={paymentLabel(order.payment_method, order.fulfillment)} />
+          <Row
+            label="Pagamento"
+            value={
+              paidOnline
+                ? `Pago online${captureLabel(order.payment_capture_method)} ✓`
+                : awaitingPayment
+                  ? 'Online · aguardando pagamento'
+                  : paymentLabel(order.payment_method, order.fulfillment)
+            }
+          />
           {order.change_for_cents && <Row label="Troco para" value={formatBRL(order.change_for_cents)} />}
         </dl>
+        {paidOnline && order.payment_receipt_url && (
+          <a
+            href={order.payment_receipt_url}
+            target="_blank"
+            rel="noopener noreferrer"
+            className="text-sm font-semibold text-cocoa underline underline-offset-4"
+          >
+            Ver comprovante do pagamento
+          </a>
+        )}
         {order.notes && <p className="text-sm text-muted-foreground">Obs.: {order.notes}</p>}
       </Card>
 
@@ -125,6 +182,12 @@ export default async function OrderPage({ params }: PageProps<'/pedido/[id]'>) {
       </Link>
     </main>
   )
+}
+
+function captureLabel(method: string | null): string {
+  if (method === 'pix') return ' (Pix)'
+  if (method === 'credit_card') return ' (cartão)'
+  return ''
 }
 
 function Card({ title, children }: { title: string; children: ReactNode }) {

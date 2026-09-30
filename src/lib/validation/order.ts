@@ -41,6 +41,8 @@ const baseOrderSchema = z.object({
 
 const deliverySchema = baseOrderSchema.extend({
   fulfillment: z.literal('delivery'),
+  // Entrega só com pagamento online (ver paymentMethodsFor).
+  paymentMethod: z.literal('online', 'Para entrega, o pagamento é online (Pix ou cartão)'),
   neighborhood: z.string('Informe o bairro').trim().min(2, 'Informe o bairro').max(80, 'Bairro muito longo'),
   cep: z
     .string()

@@ -25,6 +25,10 @@ export type PublicOrder = Pick<
   | 'status'
   | 'wants_whatsapp_updates'
   | 'created_at'
+  | 'payment_status'
+  | 'payment_expires_at'
+  | 'payment_capture_method'
+  | 'payment_receipt_url'
 > & {
   items: Pick<Tables<'order_items'>, 'id' | 'name_snapshot' | 'quantity' | 'line_total_cents' | 'note'>[]
 }
@@ -43,6 +47,7 @@ export async function getPublicOrder(id: string): Promise<PublicOrder | null> {
       `id, number, customer_name, fulfillment, zone_name_snapshot, street, street_number, complement,
        subtotal_cents, delivery_fee_cents, total_cents, payment_method, change_for_cents, notes,
        status, wants_whatsapp_updates, created_at,
+       payment_status, payment_expires_at, payment_capture_method, payment_receipt_url,
        items:order_items (id, name_snapshot, quantity, line_total_cents, note)`,
     )
     .eq('id', id)

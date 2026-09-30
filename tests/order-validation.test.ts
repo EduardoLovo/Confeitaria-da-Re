@@ -65,6 +65,7 @@ describe('toCreateOrderPayload', () => {
     const data = checkoutSchema.parse({
       ...base,
       fulfillment: 'delivery',
+      paymentMethod: 'online', // entrega só com pagamento online
       changeForCents: 5000, // ignorado
       neighborhood: ' Bela Vista ',
       cep: '01310-100',
@@ -74,6 +75,7 @@ describe('toCreateOrderPayload', () => {
     const payload = toCreateOrderPayload(data, 'hash')
     expect(payload).toMatchObject({
       fulfillment: 'delivery',
+      payment_method: 'online',
       neighborhood: 'Bela Vista',
       cep: '01310100',
       change_for_cents: null,

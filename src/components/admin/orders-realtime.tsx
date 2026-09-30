@@ -7,6 +7,7 @@ import { toast } from 'sonner'
 import { cn } from 'cn'
 
 import { isAudioUnlocked, playChime, unlockAudio } from '@/lib/admin/chime'
+import { orderAlertFor, type OrderAlert, type RealtimeOrderRow } from '@/lib/admin/order-alert'
 import { formatBRL } from '@/lib/format'
 import { createClient } from '@/lib/supabase/client'
 
@@ -79,33 +80,54 @@ export function OrdersRealtime() {
       await supabase.realtime.setAuth()
       if (!active) return
 
+      // Um pedido online gera INSERT (sem alerta) e depois UPDATE ao ser pago (alerta).
+      const alerted = new Set<string>()
+
+      function alert(order: RealtimeOrderRow, kind: Exclude<OrderAlert, null>) {
+        if (alerted.has(order.id)) return
+        alerted.add(order.id)
+        const title =
+          kind === 'paid_after_cancel'
+            ? `⚠️ Pagamento do pedido cancelado #${order.number}`
+            : `🛎️ Novo pedido #${order.number}`
+        const body =
+          kind === 'paid_after_cancel'
+            ? `${order.customer_name} pagou depois do prazo. Aceite ou devolva o valor.`
+            : `${order.customer_name} · ${formatBRL(order.total_cents)}${order.payment_status === 'paid' ? ' · pago ✅' : ''}`
+
+        if (soundRef.current) playChime()
+        navigator.vibrate?.([200, 100, 200])
+        if (!isWatchingOrders(pathnameRef.current)) setUnseen((n) => n + 1)
+        toast(title, {
+          description: body,
+          duration: 20_000,
+          action: {
+            label: 'Ver',
+            onClick: () => {
+              setUnseen(0)
+              router.push(`/admin/pedidos/${order.id}`)
+            },
+          },
+        })
+        if (document.visibilityState === 'hidden' && 'Notification' in window && Notification.permission === 'granted') {
+          new Notification(title.replace(/^\S+ /, ''), { body, tag: order.id })
+        }
+      }
+
+      function handle(event: 'INSERT' | 'UPDATE', row: RealtimeOrderRow) {
+        const kind = orderAlertFor(event, row)
+        if (kind) alert(row, kind)
+        router.refresh()
+      }
+
       channel = supabase
         .channel('admin-orders')
-        .on('postgres_changes', { event: 'INSERT', schema: 'public', table: 'orders' }, (payload) => {
-          const order = payload.new as { id: string; number: number; customer_name: string; total_cents: number }
-          if (soundRef.current) playChime()
-          navigator.vibrate?.([200, 100, 200])
-          if (!isWatchingOrders(pathnameRef.current)) setUnseen((n) => n + 1)
-          toast(`🛎️ Novo pedido #${order.number}`, {
-            description: `${order.customer_name} · ${formatBRL(order.total_cents)}`,
-            duration: 20_000,
-            action: {
-              label: 'Ver',
-              onClick: () => {
-                setUnseen(0)
-                router.push(`/admin/pedidos/${order.id}`)
-              },
-            },
-          })
-          if (document.visibilityState === 'hidden' && 'Notification' in window && Notification.permission === 'granted') {
-            new Notification(`Novo pedido #${order.number}`, {
-              body: `${order.customer_name} · ${formatBRL(order.total_cents)}`,
-              tag: order.id,
-            })
-          }
-          router.refresh()
-        })
-        .on('postgres_changes', { event: 'UPDATE', schema: 'public', table: 'orders' }, () => router.refresh())
+        .on('postgres_changes', { event: 'INSERT', schema: 'public', table: 'orders' }, (payload) =>
+          handle('INSERT', payload.new as RealtimeOrderRow),
+        )
+        .on('postgres_changes', { event: 'UPDATE', schema: 'public', table: 'orders' }, (payload) =>
+          handle('UPDATE', payload.new as RealtimeOrderRow),
+        )
         .subscribe((status) => {
           if (status === 'SUBSCRIBED') {
             setConnection('live')
